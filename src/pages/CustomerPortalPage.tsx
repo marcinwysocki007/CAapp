@@ -937,7 +937,7 @@ const AngebotCard: FC = () => {
                         <div>
                           <label className={labelCls}>Geschlecht <span className="text-red-400">*</span></label>
                           <CustomSelect value={patient.geschlecht} onChange={v => setPatient(p=>({...p,geschlecht:v}))}
-                            options={['Männlich','Weiblich','Divers']} />
+                            options={['Männlich','Weiblich']} />
                         </div>
                         <div>
                           <label className={labelCls}>Geburtsjahr <span className="text-red-400">*</span></label>
@@ -974,7 +974,7 @@ const AngebotCard: FC = () => {
                           <div>
                             <label className={labelCls}>Geschlecht <span className="text-red-400">*</span></label>
                             <CustomSelect value={patient.p2_geschlecht} onChange={v => setPatient(p=>({...p,p2_geschlecht:v}))}
-                              options={['Männlich','Weiblich','Divers']} />
+                              options={['Männlich','Weiblich']} />
                           </div>
                           <div>
                             <label className={labelCls}>Geburtsjahr <span className="text-red-400">*</span></label>
