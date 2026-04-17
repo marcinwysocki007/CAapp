@@ -570,7 +570,7 @@ const CustomSelect: FC<{
         <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-y-auto max-h-48">
           {options.map(opt => (
             <button
               key={opt}
@@ -942,7 +942,7 @@ const AngebotCard: FC = () => {
                         <div>
                           <label className={labelCls}>Geburtsjahr <span className="text-red-400">*</span></label>
                           <CustomSelect value={patient.geburtsjahr} onChange={v => setPatient(p=>({...p,geburtsjahr:v}))}
-                            options={Array.from({length:70},(_,i)=>String(2000-i))} />
+                            options={Array.from({length:70},(_,i)=>String(1931+i))} />
                         </div>
                       </div>
                       <div>
@@ -979,7 +979,7 @@ const AngebotCard: FC = () => {
                           <div>
                             <label className={labelCls}>Geburtsjahr <span className="text-red-400">*</span></label>
                             <CustomSelect value={patient.p2_geburtsjahr} onChange={v => setPatient(p=>({...p,p2_geburtsjahr:v}))}
-                              options={Array.from({length:70},(_,i)=>String(2000-i))} />
+                              options={Array.from({length:70},(_,i)=>String(1931+i))} />
                           </div>
                         </div>
                         <div className="mt-2">
