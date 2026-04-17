@@ -334,7 +334,7 @@ const CustomerPortalPage: FC = () => {
                   </div>
                   <div className="space-y-3">
                     {visibleNurses.map(({ nurse, i, status }) => (
-                      <MatchCard key={i} nurse={nurse} status={status} onNurseClick={() => openNurseFromMatch(nurse, i)} />
+                      <MatchCard key={i} nurse={nurse} status={status} onNurseClick={() => openNurseFromMatch(nurse, i)} onInvite={() => inviteNurse(i, displayName(nurse.name))} />
                     ))}
                   </div>
                 </div>
@@ -1452,7 +1452,8 @@ const MatchCard: FC<{
   nurse: Nurse;
   status: NurseStatus;
   onNurseClick: () => void;
-}> = ({ nurse, status, onNurseClick }) => {
+  onInvite?: () => void;
+}> = ({ nurse, status, onNurseClick, onInvite }) => {
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
@@ -1536,7 +1537,7 @@ const MatchCard: FC<{
           </span>
         ) : (
           <button
-            onClick={onNurseClick}
+            onClick={e => { e.stopPropagation(); onInvite?.(); }}
             className="text-xs font-bold bg-[#9B1FA1] text-white px-4 py-1.5 rounded-full hover:bg-[#7B1A85] transition-colors"
           >
             Einladen
