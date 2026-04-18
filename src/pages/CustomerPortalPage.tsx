@@ -431,7 +431,7 @@ const CustomerPortalPage: FC = () => {
               </div>
               <div className="bg-[#FFF8E7] border border-amber-200 rounded-xl px-4 py-3">
                 <p className="text-xs text-amber-800 leading-relaxed">
-                  Ohne vollständige Patientendaten können Pflegekräfte keine fundierte Bewerbung einreichen — das verlangsamt den Prozess.
+                  Ohne vollständige Patientendaten können Pflegekräfte keine fundierte Bewerbung einreichen.
                 </p>
               </div>
               <div className="flex flex-col gap-2 pt-1">
