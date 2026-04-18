@@ -1,4 +1,4 @@
-import { useState, useEffect, FC } from 'react';
+import { useState, useEffect, useRef, FC } from 'react';
 import { Check, X, Bell, MapPin, Calendar, User, UserPlus, FileText, Euro, Clock, Plane, ChevronDown, Phone, AlertCircle, Shield, Users } from 'lucide-react';
 import { Nurse } from '../types';
 import { NURSES } from '../data/nurses';
@@ -607,11 +607,36 @@ const CustomSelect: FC<{
   placeholder?: string;
 }> = ({ value, onChange, options, placeholder = 'Bitte wählen' }) => {
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const handleOpen = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: 'fixed',
+        top: r.bottom + 4,
+        left: r.left,
+        width: r.width,
+        zIndex: 9999,
+      });
+    }
+    setOpen(o => !o);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [open]);
+
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={e => { e.stopPropagation(); handleOpen(); }}
         className={`w-full border rounded-xl px-3 py-2.5 text-sm text-left flex items-center justify-between gap-2 transition-all bg-white ${
           open ? 'border-[#9B1FA1] ring-2 ring-[#9B1FA1]/10' : 'border-gray-200'
         } ${value ? 'text-gray-800' : 'text-gray-400'}`}
@@ -620,12 +645,12 @@ const CustomSelect: FC<{
         <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-y-auto max-h-48">
+        <div style={dropdownStyle} className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-y-auto max-h-48">
           {options.map(opt => (
             <button
               key={opt}
               type="button"
-              onClick={() => { onChange(opt); setOpen(false); }}
+              onClick={e => { e.stopPropagation(); onChange(opt); setOpen(false); }}
               className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                 opt === value
                   ? 'bg-[#F5EDF6] text-[#9B1FA1] font-semibold'
