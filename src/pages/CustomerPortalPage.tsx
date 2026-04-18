@@ -541,7 +541,7 @@ const BookedScreen: FC<{ app: Application; onNurseClick: (n: Nurse) => void }> =
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="font-bold text-gray-900">{name}</span>
-              <span className={`flex items-center gap-0.5 text-[10px] font-bold pl-1 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
+              <span className={`flex items-center gap-0.5 text-xs font-bold pl-1 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                 <span className="text-xs leading-none">{lvl.emoji}</span>{lvl.label}
               </span>
             </div>
@@ -549,7 +549,7 @@ const BookedScreen: FC<{ app: Application; onNurseClick: (n: Nurse) => void }> =
               <div className="flex gap-0.5">
                 {bars.map((f, i) => <div key={i} className={`w-2.5 h-[5px] rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />)}
               </div>
-              <span className="text-[11px] text-gray-500">{nurse.language.level}</span>
+              <span className="text-xs text-gray-500">{nurse.language.level}</span>
               <span className="text-gray-300 text-xs">·</span>
               <span className="text-xs font-bold text-[#9B1FA1]">{nurse.experience}</span>
             </div>
@@ -586,7 +586,7 @@ const BookedScreen: FC<{ app: Application; onNurseClick: (n: Nurse) => void }> =
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <p className="text-sm font-bold text-gray-800">{m.title}</p>
-                <span className="text-[10px] font-bold text-gray-400 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">Folgt</span>
+                <span className="text-xs font-bold text-gray-400 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">Folgt</span>
               </div>
               <p className="text-xs text-gray-500 leading-relaxed">{m.desc}</p>
             </div>
@@ -747,7 +747,7 @@ const AngebotCard: FC<{
   const allComplete = STEP_LABELS.every((_, i) => stepComplete(i));
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#9B1FA1] focus:ring-2 focus:ring-[#9B1FA1]/10 transition-all bg-white';
-  const labelCls = 'block text-xs font-semibold text-gray-500 mb-1.5';
+  const labelCls = 'block text-sm font-semibold text-gray-600 mb-1.5';
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-100">
@@ -762,7 +762,7 @@ const AngebotCard: FC<{
             <Check className="w-4 h-4 text-[#22A06B]" strokeWidth={3} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-gray-500 mb-0.5">Ihr Angebot</p>
+            <p className="text-xs text-gray-500 mb-0.5">Ihr Angebot</p>
             <p className="text-sm font-bold text-gray-900">Von Norman · 3.050 €/Mo.</p>
             <p className="text-xs text-gray-500 mt-0.5">ab 01.05.2026</p>
           </div>
@@ -777,18 +777,18 @@ const AngebotCard: FC<{
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-bold text-gray-800">Frau Von Norman</p>
-                  <p className="text-[11px] text-gray-500">graefinnorman@gmx.de</p>
+                  <p className="text-xs text-gray-500">graefinnorman@gmx.de</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-[11px] text-gray-500">Angebotsdatum: 15.04.2026</p>
-                  <p className="text-[11px] text-gray-500">Gültig bis: 15.05.2026</p>
+                  <p className="text-xs text-gray-500">Angebotsdatum: 15.04.2026</p>
+                  <p className="text-xs text-gray-500">Gültig bis: 15.05.2026</p>
                 </div>
               </div>
               <div>
                 <p className="text-sm font-bold text-gray-900 mb-2">Ihr persönliches Angebot –<br />24-Stunden-Betreuung zu Hause</p>
                 <p className="text-xs text-gray-600 mb-2">Sehr geehrte Frau Von Norman,</p>
                 <p className="text-xs text-gray-600 leading-relaxed">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <span className="font-semibold">innerhalb von 4–7 Werktagen</span> beginnen.</p>
-                <p className="text-[11px] text-gray-400 mt-3">Ihre Ilka Wysocki</p>
+                <p className="text-xs text-gray-400 mt-3">Ihre Ilka Wysocki</p>
               </div>
             </div>
 
@@ -807,8 +807,8 @@ const AngebotCard: FC<{
                 ].map(r => (
                   <div key={r.label} className="flex items-center justify-between px-4 py-2 bg-white gap-4">
                     <div>
-                      <span className="text-xs text-gray-700">{r.label}</span>
-                      {r.sub && <p className="text-[10px] text-gray-500 mt-0.5">{r.sub}</p>}
+                      <span className="text-sm text-gray-700">{r.label}</span>
+                      {r.sub && <p className="text-xs text-gray-500 mt-0.5">{r.sub}</p>}
                     </div>
                     <span className={`text-xs text-right flex-shrink-0 ${r.bold ? 'font-bold text-gray-900' : 'text-gray-600'}`}>{r.value}</span>
                   </div>
@@ -816,7 +816,7 @@ const AngebotCard: FC<{
                 {/* Vertragskonditionen */}
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-50">
                   <span className="text-xs font-semibold text-gray-500">Vertragskonditionen</span>
-                  <span className="text-[10px] font-semibold text-[#1a7a4f] bg-[#E3F7EF] border border-[#B8E8D4] px-2 py-0.5 rounded-full">100% Sorglos</span>
+                  <span className="text-xs font-semibold text-[#1a7a4f] bg-[#E3F7EF] border border-[#B8E8D4] px-2 py-0.5 rounded-full">100% Sorglos</span>
                 </div>
                 {[
                   'Täglich kündbar',
@@ -825,7 +825,7 @@ const AngebotCard: FC<{
                 ].map(label => (
                   <div key={label} className="flex items-center gap-2.5 px-4 py-2 bg-gray-50">
                     <Check className="w-3 h-3 text-[#22A06B] flex-shrink-0" strokeWidth={3} />
-                    <span className="text-xs text-gray-700">{label}</span>
+                    <span className="text-sm text-gray-700">{label}</span>
                   </div>
                 ))}
               </div>
@@ -842,18 +842,18 @@ const AngebotCard: FC<{
                 ].map(r => (
                   <div key={r.label} className="flex items-center gap-3 px-4 py-2 bg-white">
                     <span className="text-sm flex-shrink-0">{r.icon}</span>
-                    <span className="text-xs text-gray-700">{r.label}</span>
+                    <span className="text-sm text-gray-700">{r.label}</span>
                   </div>
                 ))}
                 <div className="flex items-center gap-3 px-4 py-2.5 bg-white">
                   <img src="/badge-testsieger.webp" alt="Testsieger" className="w-8 flex-shrink-0 rounded" />
                   <div>
                     <p className="text-xs font-semibold text-gray-800">Testsieger bei DIE WELT</p>
-                    <p className="text-[11px] text-gray-400 italic">„Beste Kombination aus Preis, Qualität und Kundenservice."</p>
+                    <p className="text-xs text-gray-400 italic">„Beste Kombination aus Preis, Qualität und Kundenservice."</p>
                   </div>
                 </div>
                 <div className="px-4 py-3 bg-white">
-                  <p className="text-[10px] text-gray-400 mb-2">Bekannt aus</p>
+                  <p className="text-xs text-gray-400 mb-2">Bekannt aus</p>
                   <div className="flex items-center justify-center gap-x-5 gap-y-3 flex-wrap">
                     {[
                       { src: '/media-welt.webp', alt: 'Die Welt' },
@@ -872,7 +872,7 @@ const AngebotCard: FC<{
               <div className="rounded-xl border border-[#B8E8D4] overflow-hidden divide-y divide-[#c8edd8]">
                 <div className="px-4 py-2.5 bg-[#E3F7EF]">
                   <p className="text-xs font-bold text-[#1a7a4f]">Mögliche Zuschüsse der Pflegekasse</p>
-                  <p className="text-[11px] text-[#2a9a6f] mt-0.5">Hinweis – kein Vertragsbestandteil</p>
+                  <p className="text-xs text-[#2a9a6f] mt-0.5">Hinweis – kein Vertragsbestandteil</p>
                 </div>
                 {[
                   { label: 'Pflegegeld (Pflegegrad 2)', value: '−347 €' },
@@ -889,7 +889,7 @@ const AngebotCard: FC<{
                   <span className="text-xs font-bold text-[#1a7a4f] text-right">ab 2.075 €/Monat</span>
                 </div>
               </div>
-              <p className="text-[10px] text-gray-400 leading-relaxed">
+              <p className="text-xs text-gray-400 leading-relaxed">
                 Zuschüsse sind individuell nutzbar und abhängig von Ihrer persönlichen Situation.
               </p>
             </div>
@@ -908,7 +908,7 @@ const AngebotCard: FC<{
                   <div className="w-6 h-6 rounded-full bg-[#9B1FA1] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#9B1FA1]">Profildaten vervollständigen</p>
-                    <p className="text-[11px] text-gray-500">Angaben zum Patienten & Haushalt</p>
+                    <p className="text-xs text-gray-500">Angaben zum Patienten & Haushalt</p>
                   </div>
                   <ChevronDown className="w-4 h-4 text-[#9B1FA1] -rotate-90 flex-shrink-0" />
                 </button>
@@ -917,7 +917,7 @@ const AngebotCard: FC<{
                   <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">2</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-700">Auswahl Ihrer Pflegekraft</p>
-                    <p className="text-[11px] text-gray-500">Passende Betreuerin kennenlernen</p>
+                    <p className="text-xs text-gray-500">Passende Betreuerin kennenlernen</p>
                   </div>
                 </div>
                 {/* Step 3 */}
@@ -925,7 +925,7 @@ const AngebotCard: FC<{
                   <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">3</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-700">Anreise & Betreuungsbeginn</p>
-                    <p className="text-[11px] text-gray-500">Pflegekraft kommt zu Ihnen nach Hause</p>
+                    <p className="text-xs text-gray-500">Pflegekraft kommt zu Ihnen nach Hause</p>
                   </div>
                 </div>
                 {/* Step 4 */}
@@ -933,7 +933,7 @@ const AngebotCard: FC<{
                   <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">4</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-700">Laufende Betreuung</p>
-                    <p className="text-[11px] text-gray-500">Ihr persönlicher Ansprechpartner begleitet Sie</p>
+                    <p className="text-xs text-gray-500">Ihr persönlicher Ansprechpartner begleitet Sie</p>
                   </div>
                 </div>
               </div>
@@ -956,13 +956,13 @@ const AngebotCard: FC<{
             }
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-gray-500 mb-0.5">Patientendaten</p>
+            <p className="text-xs text-gray-500 mb-0.5">Patientendaten</p>
             {allComplete && saved ? (
               <p className="text-sm font-bold text-gray-900">Vollständig ausgefüllt</p>
             ) : (
               <div className="flex items-center gap-2">
                 <p className="text-sm font-bold text-gray-900">Unvollständig</p>
-                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Bitte ergänzen</span>
+                <span className="text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">Bitte ergänzen</span>
               </div>
             )}
           </div>
@@ -980,7 +980,7 @@ const AngebotCard: FC<{
               </div>
               <div>
                 <p className="text-sm font-bold text-[#9B1FA1]">Patientendaten ausfüllen</p>
-                <p className="text-[11px] text-[#9B1FA1]/70">Damit Pflegekräfte sich optimal vorbereiten können</p>
+                <p className="text-xs text-[#9B1FA1]/70">Damit Pflegekräfte sich optimal vorbereiten können</p>
               </div>
             </div>
 
@@ -1041,7 +1041,7 @@ const AngebotCard: FC<{
                   {patient.anzahl !== '' && (
                     <>
                       {zwei && (
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider pt-1">Person 1</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Person 1</p>
                       )}
                       <div className="grid grid-cols-2 gap-2">
                         <div>
@@ -1079,7 +1079,7 @@ const AngebotCard: FC<{
                   {zwei && (
                     <>
                       <div className="border-t border-gray-100 pt-3">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Person 2</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Person 2</p>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className={labelCls}>Geschlecht <span className="text-red-400">*</span></label>
@@ -1119,7 +1119,7 @@ const AngebotCard: FC<{
               {step === 1 && (
                 <>
                   {zwei && (
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Person 1</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Person 1</p>
                   )}
                   <div>
                     <label className={labelCls}>Mobilität <span className="text-red-400">*</span></label>
@@ -1159,7 +1159,7 @@ const AngebotCard: FC<{
                   {/* Patient 2 Pflegebedarf */}
                   {zwei && (
                     <div className="border-t border-gray-100 pt-3">
-                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Person 2</p>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Person 2</p>
                       <div className="space-y-3">
                         <div>
                           <label className={labelCls}>Mobilität <span className="text-red-400">*</span></label>
@@ -1323,7 +1323,7 @@ const NurseRow: FC<{ nurse: Nurse }> = ({ nurse }) => {
           </div>
         )}
         {nurse.isLive && (
-          <div className="absolute -top-1 -right-1 bg-[#22A06B] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
+          <div className="absolute -top-1 -right-1 bg-[#22A06B] text-white text-xs font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
@@ -1346,7 +1346,7 @@ const NurseRow: FC<{ nurse: Nurse }> = ({ nurse }) => {
             </span>
           </div>
           <span
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0 ${
+            className={`text-xs font-bold px-2.5 py-1 rounded-full border flex-shrink-0 ${
               nurse.availableSoon
                 ? 'bg-[#E3F7EF] text-[#22A06B] border-[#B8E8D4]'
                 : 'bg-[#FEF3E2] text-[#B45309] border-[#F9D99A]'
@@ -1367,7 +1367,7 @@ const NurseRow: FC<{ nurse: Nurse }> = ({ nurse }) => {
               />
             ))}
           </div>
-          <span className="text-[11px] font-semibold text-gray-500 flex-shrink-0">
+          <span className="text-xs font-semibold text-gray-500 flex-shrink-0">
             {nurse.language.level}
           </span>
         </div>
@@ -1380,7 +1380,7 @@ const NurseRow: FC<{ nurse: Nurse }> = ({ nurse }) => {
           {nurse.history && (
             <>
               <span className="text-gray-300">·</span>
-              <span className="text-[11px] text-gray-500 whitespace-nowrap">
+              <span className="text-xs text-gray-500 whitespace-nowrap">
                 {nurse.history.assignments} Einsätze · Ø {avgDur.toFixed(1).replace('.', ',')} Mon.
               </span>
             </>
@@ -1434,7 +1434,7 @@ const AppCard: FC<{
                 <span className="text-xs text-gray-500 flex-shrink-0">{nurse.age} J.</span>
               </div>
               {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
-                <span className={`flex items-center gap-1 text-[10px] font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
+                <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                   <span className="text-sm leading-none">{lvl.emoji}</span>
                   {lvl.label}
                 </span>
@@ -1449,14 +1449,14 @@ const AppCard: FC<{
                   <div key={i} className={`w-2.5 h-[5px] rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
                 ))}
               </div>
-              <span className="text-[11px] font-semibold text-gray-500">{nurse.language.level}</span>
+              <span className="text-xs font-semibold text-gray-500">{nurse.language.level}</span>
             </div>
 
             {/* Row 3: Experience + assignments badge */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold text-[#9B1FA1]">{nurse.experience}</span>
               {nurse.history && (
-                <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
+                <span className="text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
                   {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.
                 </span>
               )}
@@ -1476,10 +1476,10 @@ const AppCard: FC<{
             <p className="font-semibold text-gray-800 truncate">
               {app.offer.anreisedatum} – {app.offer.abreisedatum}
             </p>
-            <p className="text-[11px] text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5">
               Reisekosten: {app.offer.anreisekosten} € pro Fahrt
             </p>
-            <p className="text-[11px] text-gray-500 mt-0">
+            <p className="text-xs text-gray-500 mt-0">
               {app.offer.kuendigungsfrist} Kündigungsfrist
             </p>
           </div>
@@ -1615,7 +1615,7 @@ const MatchCard: FC<{
                 <span className="text-xs text-gray-500 flex-shrink-0">{nurse.age} J.</span>
               </div>
               {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
-                <span className={`flex items-center gap-1 text-[10px] font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
+                <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                   <span className="text-sm leading-none">{lvl.emoji}</span>
                   {lvl.label}
                 </span>
@@ -1630,14 +1630,14 @@ const MatchCard: FC<{
                   <div key={i} className={`w-2.5 h-[5px] rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
                 ))}
               </div>
-              <span className="text-[11px] font-semibold text-gray-500">{nurse.language.level}</span>
+              <span className="text-xs font-semibold text-gray-500">{nurse.language.level}</span>
             </div>
 
             {/* Row 3: Experience + assignments badge */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold text-[#9B1FA1]">{nurse.experience}</span>
               {nurse.history && (
-                <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
+                <span className="text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
                   {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.
                 </span>
               )}
@@ -1784,7 +1784,7 @@ const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
 
           {/* Header row */}
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">Ihre Beraterin</p>
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Ihre Beraterin</p>
             <button
               onClick={onClose}
               className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
@@ -1819,7 +1819,7 @@ const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
                 <Phone className="w-3.5 h-3.5 flex-shrink-0" />
                 089 200 000 830
               </a>
-              <p className="text-[11px] text-gray-500 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
+              <p className="text-xs text-gray-500 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
             </div>
           </div>
 
@@ -1827,21 +1827,21 @@ const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
           <div className="grid grid-cols-3 gap-2">
             <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
               <img src="/badge-testsieger.webp" alt="Testsieger" className="h-8 w-auto mx-auto mb-1.5 object-contain" />
-              <p className="text-[10px] font-semibold text-gray-500 leading-tight">Testsieger<br/>Die Welt</p>
+              <p className="text-xs font-semibold text-gray-500 leading-tight">Testsieger<br/>Die Welt</p>
             </div>
             <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
               <p className="text-2xl leading-none mb-1">📅</p>
-              <p className="text-[10px] font-semibold text-gray-500 leading-tight">20+ Jahre<br/>Erfahrung</p>
+              <p className="text-xs font-semibold text-gray-500 leading-tight">20+ Jahre<br/>Erfahrung</p>
             </div>
             <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
               <p className="text-2xl leading-none mb-1">❤️</p>
-              <p className="text-[10px] font-semibold text-gray-500 leading-tight">60.000+<br/>Einsätze</p>
+              <p className="text-xs font-semibold text-gray-500 leading-tight">60.000+<br/>Einsätze</p>
             </div>
           </div>
 
           {/* Media logos */}
           <div>
-            <p className="text-[10px] font-semibold text-gray-300 uppercase tracking-wider text-center mb-2.5">Bekannt aus</p>
+            <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider text-center mb-2.5">Bekannt aus</p>
             <div className="flex items-center justify-center gap-4 flex-wrap">
               {MEDIA_LOGOS.map(logo => (
                 <img
@@ -1921,7 +1921,7 @@ const DeclineConfirmModal: FC<{
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="font-bold text-sm text-gray-900">{name}</span>
                   <span className="text-xs text-gray-400">{nurse.age} J.</span>
-                  <span className={`flex items-center gap-0.5 text-[10px] font-bold pl-1 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
+                  <span className={`flex items-center gap-0.5 text-xs font-bold pl-1 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                     <span className="text-xs leading-none">{lvl.emoji}</span>{lvl.label}
                   </span>
                 </div>
@@ -1931,7 +1931,7 @@ const DeclineConfirmModal: FC<{
 
             {/* Optional message */}
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+              <label className="block text-sm font-semibold text-gray-600 mb-1.5">
                 Nachricht an die Agentur <span className="font-normal text-gray-400">(optional)</span>
               </label>
               <textarea
@@ -2078,7 +2078,7 @@ const AngebotPruefenModal: FC<{
                 {/* Details zur Bewerbung */}
                 <div>
                   <p className="text-xs font-bold text-gray-700 mb-1">Details zur Bewerbung</p>
-                  <p className="text-[11px] text-gray-500 mb-2">{offer.submittedAt}</p>
+                  <p className="text-xs text-gray-500 mb-2">{offer.submittedAt}</p>
                   <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
                     {[
                       { label: 'Mtl. Betreuungskosten', value: `${offer.monatlicheKosten.toLocaleString('de-DE')} €`, bold: true },
@@ -2193,12 +2193,12 @@ const AngebotPruefenModal: FC<{
                           <span>{m.betrag.toLocaleString('de-DE')} €</span>
                         </div>
                         {m.details.map(d => (
-                          <p key={d} className="text-[11px] text-gray-400 text-right">{d}</p>
+                          <p key={d} className="text-xs text-gray-400 text-right">{d}</p>
                         ))}
                       </div>
                     ))}
                   </div>
-                  <p className="text-[10px] text-gray-400">Reisekosten werden nach <em>halben Tag</em> berechnet. Provision ist im Monatspreis enthalten.</p>
+                  <p className="text-xs text-gray-400">Reisekosten werden nach <em>halben Tag</em> berechnet. Provision ist im Monatspreis enthalten.</p>
                 </div>
               </div>
             )}
@@ -2441,12 +2441,12 @@ const CustomerNurseModal: FC<{
               <div className="flex-1 min-w-0 pt-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-xl font-bold text-gray-900 leading-tight">{name}</h2>
-                  <span className={`flex items-center gap-1 text-[10px] font-bold pl-1.5 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
+                  <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                     <span className="text-sm leading-none">{lvl.emoji}</span>{lvl.label}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">{nurse.age} Jahre</p>
-                <span className={`inline-block mt-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                <span className={`inline-block mt-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${
                   nurse.availableSoon ? 'bg-[#E3F7EF] text-[#22A06B] border-[#B8E8D4]' : 'bg-[#FEF3E2] text-[#B45309] border-[#F9D99A]'
                 }`}>
                   {nurse.availability}
@@ -2497,7 +2497,7 @@ const CustomerNurseModal: FC<{
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-bold text-gray-900">Letzte Einsätze</h3>
                   {nurse.history && (
-                    <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
                       {nurse.history.assignments} Einsätze · Ø {avgWo} Wo.
                     </span>
                   )}
@@ -2506,10 +2506,10 @@ const CustomerNurseModal: FC<{
                   {nurse.detailedAssignments.map((a, i) => (
                     <div key={i} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                        <div><p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Zeitraum</p><p className="text-xs font-semibold text-gray-800">{a.startDate} – {a.endDate}</p></div>
-                        <div><p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Ort</p><p className="text-xs font-semibold text-gray-800">{a.postalCode} {a.city}</p></div>
-                        <div><p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Patienten</p><p className="text-xs font-semibold text-gray-800">{a.patientCount} {a.patientCount === 1 ? 'Patient' : 'Patienten'}</p></div>
-                        <div><p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Mobilität</p><p className="text-xs font-semibold text-gray-800">{a.mobility}</p></div>
+                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Zeitraum</p><p className="text-xs font-semibold text-gray-800">{a.startDate} – {a.endDate}</p></div>
+                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Ort</p><p className="text-xs font-semibold text-gray-800">{a.postalCode} {a.city}</p></div>
+                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Patienten</p><p className="text-xs font-semibold text-gray-800">{a.patientCount} {a.patientCount === 1 ? 'Patient' : 'Patienten'}</p></div>
+                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Mobilität</p><p className="text-xs font-semibold text-gray-800">{a.mobility}</p></div>
                       </div>
                     </div>
                   ))}
