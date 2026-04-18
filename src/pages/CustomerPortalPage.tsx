@@ -1526,15 +1526,20 @@ const AppCard: FC<{
       className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
       style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}
     >
-      {/* Invited banner */}
-      {app.isInvited && (
-        <div className="flex items-center gap-1.5 px-5 py-2.5 bg-[#F5EDF6] border-b border-[#EDD9EF]">
-          <svg className="w-3.5 h-3.5 text-[#9B1FA1] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-          <span className="text-xs font-semibold text-[#9B1FA1]">Von Ihnen eingeladen</span>
-        </div>
-      )}
+      {/* Header band — always visible */}
+      <div className="flex items-center justify-between px-5 py-2.5 bg-[#F5EDF6] border-b border-[#EDD9EF]">
+        {app.isInvited ? (
+          <div className="flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-[#9B1FA1] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <span className="text-xs font-semibold text-[#9B1FA1]">Von Ihnen eingeladen</span>
+          </div>
+        ) : (
+          <span className="text-xs font-semibold text-[#9B1FA1]">Neue Bewerbung</span>
+        )}
+        <span className="text-xs text-[#9B1FA1]">Eingegangen: {app.appliedAt}</span>
+      </div>
 
       {/* Clickable nurse row → opens profile */}
       {/* Nurse info — clickable */}
