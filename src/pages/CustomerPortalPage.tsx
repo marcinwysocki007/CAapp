@@ -28,6 +28,7 @@ interface Application {
   status: AppStatus;
   message: string;
   offer: OfferDetails;
+  isInvited?: boolean;
 }
 
 interface NurseStatuses {
@@ -43,6 +44,7 @@ const MOCK_APPLICATIONS: Application[] = [
     agencyName: 'CarePartner GmbH',
     appliedAt: 'vor 23 Min.',
     status: 'new',
+    isInvited: true,
     message:
       'Anna hat 6 Jahre Erfahrung in der 24h-Betreuung und ist sofort einsatzbereit. Ihre Sprachkenntnisse auf B2-Niveau ermöglichen eine reibungslose Kommunikation.',
     offer: {
@@ -209,7 +211,14 @@ const CustomerPortalPage: FC = () => {
   };
 
   const confirmInviteNurse = (idx: number, name: string) => {
+    const nurseName = MATCHED_NURSES[idx]?.name ?? '';
     setNurseStatuses((prev) => ({ ...prev, [idx]: 'invited' }));
+    // Mark matching application as invited (nurse applied after being invited)
+    if (nurseName) {
+      setApplications((prev) =>
+        prev.map((a) => a.nurse.name === nurseName ? { ...a, isInvited: true } : a)
+      );
+    }
     showToast(`✓ ${name} wurde eingeladen!`);
     if (!patientSaved && !firstInviteDone) {
       setFirstInviteDone(true);
@@ -1533,6 +1542,15 @@ const AppCard: FC<{
       className="bg-white rounded-2xl border border-[#9B1FA1] shadow-[0_0_0_3px_rgba(155,31,161,0.08)] overflow-hidden"
       style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}
     >
+      {/* Invited banner */}
+      {app.isInvited && (
+        <div className="flex items-center gap-1.5 px-4 py-2 bg-[#F5EDF6] border-b border-[#E8D0EA]">
+          <svg className="w-3.5 h-3.5 text-[#9B1FA1] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <span className="text-xs font-semibold text-[#9B1FA1]">Von Ihnen eingeladen</span>
+        </div>
+      )}
       {/* Clickable nurse row → opens profile */}
       <div className="p-4 cursor-pointer active:bg-gray-50" onClick={() => onNurseClick(nurse)}>
         <div className="flex items-start gap-3">
@@ -1636,6 +1654,14 @@ const AppCardDone: FC<{
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {app.isInvited && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F5EDF6] border-b border-[#E8D0EA]">
+          <svg className="w-3 h-3 text-[#9B1FA1] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <span className="text-xs font-semibold text-[#9B1FA1]">Von Ihnen eingeladen</span>
+        </div>
+      )}
       <div
         className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
         onClick={() => onNurseClick(nurse, app)}
