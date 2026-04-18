@@ -55,7 +55,7 @@ const MOCK_APPLICATIONS: Application[] = [
       abreisekosten: 120,
       reisetage: 'Halb',
       feiertagszuschlag: 0,
-      kuendigungsfrist: '14 Tage',
+      kuendigungsfrist: 'Täglich kündbar',
       submittedAt: '16.04.2026, 09:14',
     },
   },
@@ -75,7 +75,7 @@ const MOCK_APPLICATIONS: Application[] = [
       abreisekosten: 140,
       reisetage: 'Halb',
       feiertagszuschlag: 75,
-      kuendigungsfrist: '14 Tage',
+      kuendigungsfrist: 'Täglich kündbar',
       submittedAt: '16.04.2026, 08:31',
     },
   },
@@ -95,7 +95,7 @@ const MOCK_APPLICATIONS: Application[] = [
       abreisekosten: 130,
       reisetage: 'Halb',
       feiertagszuschlag: 0,
-      kuendigungsfrist: '14 Tage',
+      kuendigungsfrist: 'Täglich kündbar',
       submittedAt: '16.04.2026, 07:55',
     },
   },
@@ -1619,7 +1619,7 @@ const AppCard: FC<{
           </div>
           <div className="h-px bg-[#E8D0EA] mb-1.5" />
           <p className="text-xs text-gray-600 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Reisekosten: {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist} Kündigungsfrist</p>
+          <p className="text-xs text-gray-500 mt-0.5">Reisekosten á {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist}</p>
         </div>
       </div>
 
