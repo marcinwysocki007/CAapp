@@ -2107,6 +2107,14 @@ const AngebotPruefenModal: FC<{
   const [einsatzort, setEinsatzort] = useState('80331, München');
   const [telefon, setTelefon] = useState('');
   const [email, setEmail] = useState('');
+  const [kpAnrede, setKpAnrede] = useState('');
+  const [kpVorname, setKpVorname] = useState('');
+  const [kpNachname, setKpNachname] = useState('');
+  const [kpTelefon, setKpTelefon] = useState('');
+  const [kpEmail, setKpEmail] = useState('');
+  const [agbChecked, setAgbChecked] = useState(false);
+  const canAccept = vorname.trim() !== '' && nachname.trim() !== '' && einsatzort.trim() !== ''
+    && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && agbChecked;
 
   // Monthly summary data (mock, based on offer)
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
@@ -2170,10 +2178,10 @@ const AngebotPruefenModal: FC<{
 
             {/* ── STEP 1 ── */}
             {step === 1 && (
-              <div className="p-5 space-y-4">
-                {/* Nurse mini-card with Profil link */}
+              <div className="p-5 space-y-5">
+                {/* Nurse mini-card */}
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                  <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden">
+                  <div className="w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden">
                     {nurse.image ? (
                       <img src={nurse.image} alt={nurse.name} className="w-full h-full object-cover" />
                     ) : (
@@ -2184,52 +2192,46 @@ const AngebotPruefenModal: FC<{
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-gray-900">{name}</p>
-                    <p className="text-xs text-gray-500">
-                      {nurse.age} J. · {nurse.experience} · Deutsch {nurse.language.level} · {nurse.history?.assignments} Einsätze
-                    </p>
+                    <p className="text-sm text-gray-500">{nurse.age} J. · {nurse.experience} · Deutsch {nurse.language.level}</p>
                   </div>
-                  <button
-                    onClick={() => onNurseClick(nurse)}
-                    className="text-xs font-semibold text-[#9B1FA1] hover:underline flex-shrink-0 flex items-center gap-0.5"
-                  >
+                  <button onClick={() => onNurseClick(nurse)} className="text-sm font-semibold text-[#9B1FA1] hover:underline flex-shrink-0">
                     Profil →
                   </button>
                 </div>
 
-                {/* Details zur Bewerbung */}
+                {/* Bewerbungstext — prominent */}
+                {app.message && (
+                  <div>
+                    <p className="text-sm font-bold text-gray-700 mb-2">Nachricht der Agentur</p>
+                    <div className="border-l-4 border-[#9B1FA1] pl-4 py-1">
+                      <p className="text-sm text-gray-600 leading-relaxed">„{app.message}"</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Konditionen */}
                 <div>
-                  <p className="text-xs font-bold text-gray-700 mb-1">Details zur Bewerbung</p>
-                  <p className="text-xs text-gray-500 mb-2">{offer.submittedAt}</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-bold text-gray-700">Konditionen</p>
+                    <p className="text-xs text-gray-400">{offer.submittedAt}</p>
+                  </div>
                   <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
                     {[
                       { label: 'Mtl. Betreuungskosten', value: `${offer.monatlicheKosten.toLocaleString('de-DE')} €`, bold: true },
-                      { label: 'Anreisedatum', value: offer.anreisedatum, bold: false },
-                      { label: 'Abreisedatum', value: `Vorauss. ${offer.abreisedatum}`, bold: false },
+                      { label: 'Anreisedatum', value: offer.anreisedatum },
+                      { label: 'Abreisedatum', value: `Vorauss. ${offer.abreisedatum}` },
+                      { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
+                      { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
+                      { label: 'Reisetage', value: offer.reisetage },
+                      { label: 'Feiertagszuschlag', value: offer.feiertagszuschlag === 0 ? '0 €' : `${offer.feiertagszuschlag} €/Tag` },
+                      { label: 'Kündigungsfrist', value: offer.kuendigungsfrist },
                     ].map(row => (
-                      <div key={row.label} className="flex items-center justify-between px-4 py-2 bg-white">
-                        <span className="text-xs text-gray-500">{row.label}</span>
-                        <span className={`text-xs ${row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
-                          {row.value}
-                        </span>
+                      <div key={row.label} className="flex items-center justify-between px-4 py-2.5 bg-white">
+                        <span className="text-sm text-gray-500">{row.label}</span>
+                        <span className={`text-sm ${(row as any).bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.value}</span>
                       </div>
                     ))}
                   </div>
-                </div>
-
-                {/* Reisekosten & Konditionen */}
-                <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
-                  {[
-                    { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
-                    { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
-                    { label: 'Berechnung der Reisetage', value: offer.reisetage },
-                    { label: 'Feiertagszuschlag', value: offer.feiertagszuschlag === 0 ? '0 €' : `${offer.feiertagszuschlag} €/Tag` },
-                    { label: 'Kündigungsfrist', value: offer.kuendigungsfrist },
-                  ].map(row => (
-                    <div key={row.label} className="flex items-center justify-between px-4 py-2 bg-white">
-                      <span className="text-xs text-gray-500">{row.label}</span>
-                      <span className="text-xs font-semibold text-gray-700">{row.value}</span>
-                    </div>
-                  ))}
                 </div>
               </div>
             )}
@@ -2237,10 +2239,10 @@ const AngebotPruefenModal: FC<{
             {/* ── STEP 2 ── */}
             {step === 2 && (
               <div className="p-5 space-y-5">
-                {/* Form */}
+                {/* Hauptpatient */}
                 <div>
-                  <p className="text-sm font-bold text-gray-900 mb-4">Hauptpatient (Vertragspartner)</p>
-                  <div className="space-y-4">
+                  <p className="text-sm font-bold text-gray-700 mb-3">Hauptpatient (Vertragspartner)</p>
+                  <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className={labelCls}>Anrede</label>
@@ -2286,6 +2288,47 @@ const AngebotPruefenModal: FC<{
                   </div>
                 </div>
 
+                <div className="h-px bg-gray-100" />
+
+                {/* Kontaktperson */}
+                <div>
+                  <p className="text-sm font-bold text-gray-700 mb-0.5">Kontaktperson <span className="text-gray-400 font-normal">(in Notfällen)</span></p>
+                  <p className="text-sm text-gray-400 mb-3">Wen sollen wir bei Notfällen kontaktieren?</p>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={labelCls}>Anrede</label>
+                        <select value={kpAnrede} onChange={e => setKpAnrede(e.target.value)} className={inputCls}>
+                          <option value="">Bitte wählen</option>
+                          <option>Frau</option><option>Herr</option><option>Divers</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={labelCls}>Vorname *</label>
+                        <input value={kpVorname} onChange={e => setKpVorname(e.target.value)} placeholder="Vorname" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Nachname *</label>
+                        <input value={kpNachname} onChange={e => setKpNachname(e.target.value)} placeholder="Nachname" className={inputCls} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={labelCls}>Telefon *</label>
+                        <input value={kpTelefon} onChange={e => setKpTelefon(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>E-Mail</label>
+                        <input value={kpEmail} onChange={e => setKpEmail(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="h-px bg-gray-100" />
+
                 {/* Summary box */}
                 <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-3">
                   <p className="text-xs font-bold text-gray-700 mb-1">Zusammenfassung</p>
@@ -2320,6 +2363,16 @@ const AngebotPruefenModal: FC<{
                   </div>
                   <p className="text-xs text-gray-400">Reisekosten werden nach <em>halben Tag</em> berechnet. Provision ist im Monatspreis enthalten.</p>
                 </div>
+
+                {/* AGB Checkbox */}
+                <label className="flex items-start gap-3 cursor-pointer p-4 bg-gray-50 border border-gray-200 rounded-xl" onClick={() => setAgbChecked(v => !v)}>
+                  <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border-2 transition-all ${agbChecked ? 'bg-[#9B1FA1] border-[#9B1FA1]' : 'border-gray-300 bg-white'}`}>
+                    {agbChecked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                  </div>
+                  <span className="text-sm text-gray-600 leading-relaxed">
+                    Ich akzeptiere das Angebot verbindlich und bestätige, dass alle Angaben korrekt sind. Der Vertrag wird direkt mit der Agentur geschlossen.
+                  </span>
+                </label>
               </div>
             )}
           </div>
@@ -2342,8 +2395,9 @@ const AngebotPruefenModal: FC<{
                   ← Zurück
                 </button>
                 <button
-                  onClick={() => onAccept(app.id)}
-                  className="flex-1 bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-xl py-3 text-sm font-bold transition-all"
+                  onClick={() => canAccept && onAccept(app.id)}
+                  disabled={!canAccept}
+                  className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${canAccept ? 'bg-[#9B1FA1] hover:bg-[#7B1A85] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                 >
                   Betreuungskraft akzeptieren
                 </button>
