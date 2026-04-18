@@ -1589,16 +1589,16 @@ const AppCard: FC<{
       <div className="border-t border-gray-100 px-5 py-4">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="min-w-0">
-            <p className="text-xs text-gray-500 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
-            <p className="text-xs text-gray-400 mt-0.5 truncate">Reisekosten á {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist}</p>
+            <p className="text-sm font-medium text-gray-700 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">Reisekosten á {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist}</p>
           </div>
           <div className="text-right flex-shrink-0">
-            <p className="text-xs text-gray-400 mb-0.5">Mtl. Betreuungskosten</p>
+            <p className="text-xs text-gray-500 mb-0.5">Mtl. Betreuungskosten</p>
             <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
           </div>
         </div>
         {message && (
-          <p className="text-sm text-gray-400 leading-relaxed line-clamp-2 border-l-2 border-gray-200 pl-3">„{message}"</p>
+          <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 border-l-2 border-[#D8A9DC] pl-3">„{message}"</p>
         )}
       </div>
 
