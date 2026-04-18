@@ -1597,17 +1597,16 @@ const AppCard: FC<{
       </div>
 
       {/* Actions */}
-      <div className="border-t border-gray-100 flex">
+      <div className="flex gap-2.5 px-5 pb-5">
         <button
           onClick={onReview}
-          className="flex-1 bg-[#9B1FA1] hover:bg-[#7B1A85] text-white py-4 text-sm font-semibold transition-all"
+          className="flex-1 bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-2xl py-3.5 text-sm font-semibold transition-all"
         >
           Angebot prüfen
         </button>
-        <div className="w-px bg-white/20" />
         <button
           onClick={() => onDecline(app.id)}
-          className="px-6 bg-gray-100 hover:bg-gray-200 text-gray-500 py-4 text-sm font-semibold transition-all"
+          className="px-5 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-2xl py-3.5 text-sm font-semibold transition-all"
         >
           Ablehnen
         </button>
