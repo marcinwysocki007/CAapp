@@ -238,8 +238,8 @@ const CustomerPortalPage: FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-200 md:flex md:items-start md:justify-center md:py-10">
-    <div className="min-h-screen md:min-h-0 bg-gray-50 w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
+    <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
+    <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
     <div className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
       {/* Toast */}
       {toast && (
@@ -255,7 +255,7 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Navbar */}
-      <nav className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+      <nav className="sticky top-0 z-40 bg-white border-b border-gray-100">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/LOGO-PRIMUNDUS.webp" alt="Primundus" className="h-6" />
@@ -278,11 +278,11 @@ const CustomerPortalPage: FC = () => {
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
 
         {/* ── Intro ── */}
-        <div className="px-1">
-          <h1 className="text-xl font-bold text-gray-900 leading-snug mb-1">
+        <div className="px-1 pt-2">
+          <h1 className="text-2xl font-bold text-gray-900 leading-snug mb-2">
             Unser Kundenportal.<br />Transparent. In Ihren Händen.
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-500 leading-relaxed">
             Kein Rätselraten — Angebot ansehen, passende Betreuungskräfte einladen und Bewerbungen direkt annehmen.
           </p>
         </div>
@@ -292,43 +292,27 @@ const CustomerPortalPage: FC = () => {
 
         {/* ── Bewerbungsstatus ── */}
         {!hasPending ? (
-          <div className="bg-white border border-gray-200 rounded-2xl px-5 py-5 shadow-sm space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#F5EDF6] flex items-center justify-center flex-shrink-0">
-                <Bell className="w-5 h-5 text-[#9B1FA1]" />
-              </div>
-              <div>
-                <p className="text-base font-bold text-gray-900">Bewerbungen werden für Sie vorbereitet</p>
-                <p className="text-xs text-gray-600 mt-0.5">Wir benachrichtigen Sie sobald neue eingehen.</p>
-              </div>
+          <div className="bg-gray-50 rounded-2xl px-5 py-4 flex items-center gap-4">
+            <div className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
+              <Bell className="w-4 h-4 text-gray-400" />
             </div>
-            <div className="border-t border-gray-100 pt-3 flex items-start gap-2.5">
-              <span className="text-base leading-none mt-0.5 flex-shrink-0">💡</span>
-              <div>
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  Laden Sie in der Zwischenzeit gerne passende Pflegekräfte ein, sich bei Ihnen zu bewerben.
-                </p>
-                <button
-                  onClick={() => setShowInfoPopup(true)}
-                  className="text-xs font-semibold text-[#9B1FA1] hover:underline mt-1 inline-block"
-                >
-                  Mehr Infos →
-                </button>
-              </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800">Bewerbungen werden für Sie vorbereitet</p>
+              <p className="text-sm text-gray-400 mt-0.5">Wir benachrichtigen Sie sobald neue eingehen.</p>
             </div>
           </div>
         ) : (
-          <div className="bg-gradient-to-br from-[#E3F7EF] to-[#d0f2e4] border border-[#B8E8D4] rounded-2xl px-5 py-4">
-            <div className="flex items-center gap-3">
-              <div className="text-3xl leading-none flex-shrink-0">🎉</div>
-              <div>
-                <p className="text-base font-bold text-gray-900">
-                  {pendingApps.length === 1 ? 'Eine Bewerbung aktiv!' : `${pendingApps.length} Bewerbungen aktiv!`}
-                </p>
-                <p className="text-sm text-[#1a7a4f] mt-0.5">
-                  Schauen Sie sich {pendingApps.length === 1 ? 'die Pflegekraft' : 'die Pflegekräfte'} in Ruhe an und entscheiden Sie, welches Angebot am besten passt.
-                </p>
-              </div>
+          <div className="bg-[#F0FAF5] rounded-2xl px-5 py-4 flex items-center gap-4">
+            <div className="w-9 h-9 rounded-full bg-white border border-[#B8E8D4] flex items-center justify-center flex-shrink-0 text-lg">
+              🎉
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900">
+                {pendingApps.length === 1 ? 'Eine Bewerbung aktiv!' : `${pendingApps.length} Bewerbungen aktiv!`}
+              </p>
+              <p className="text-sm text-[#1a7a4f] mt-0.5">
+                Schauen Sie sich {pendingApps.length === 1 ? 'die Pflegekraft' : 'die Pflegekräfte'} in Ruhe an und entscheiden Sie, welches Angebot am besten passt.
+              </p>
             </div>
           </div>
         )}
@@ -1539,40 +1523,42 @@ const AppCard: FC<{
 
   return (
     <div
-      className="bg-white rounded-2xl border border-[#9B1FA1] shadow-[0_0_0_3px_rgba(155,31,161,0.08)] overflow-hidden"
+      className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
       style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}
     >
       {/* Invited banner */}
       {app.isInvited && (
-        <div className="flex items-center gap-1.5 px-4 py-2 bg-[#F5EDF6] border-b border-[#E8D0EA]">
+        <div className="flex items-center gap-1.5 px-5 py-2.5 bg-[#F5EDF6] border-b border-[#EDD9EF]">
           <svg className="w-3.5 h-3.5 text-[#9B1FA1] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
           <span className="text-xs font-semibold text-[#9B1FA1]">Von Ihnen eingeladen</span>
         </div>
       )}
+
       {/* Clickable nurse row → opens profile */}
-      <div className="p-4 cursor-pointer active:bg-gray-50" onClick={() => onNurseClick(nurse)}>
-        <div className="flex items-start gap-3">
-          {/* Photo — no Live badge */}
+      {/* Nurse info — clickable */}
+      <div className="px-5 pt-5 pb-5 cursor-pointer active:bg-gray-50" onClick={() => onNurseClick(nurse)}>
+        <div className="flex items-center gap-4">
+          {/* Photo */}
           <div className="flex-shrink-0">
             {nurse.image ? (
-              <img src={nurse.image} alt={nurse.name} className="w-14 h-14 rounded-xl object-cover" />
+              <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-2xl object-cover" />
             ) : (
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold text-white"
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold text-white"
                 style={{ backgroundColor: nurse.color }}>
                 {inits}
               </div>
             )}
           </div>
 
-          {/* Info */}
+          {/* Name + details */}
           <div className="flex-1 min-w-0">
-            {/* Row 1: Name + Age | Level badge */}
-            <div className="flex items-center justify-between gap-2 mb-1">
+            {/* Zeile 1: Name + Alter | Level-Badge */}
+            <div className="flex items-start justify-between gap-2 mb-1">
               <div className="flex items-baseline gap-1.5 min-w-0">
-                <span className="font-bold text-gray-900 leading-tight">{name}</span>
-                <span className="text-xs text-gray-500 flex-shrink-0">{nurse.age} J.</span>
+                <p className="text-base font-bold text-gray-900 leading-tight">{name}</p>
+                <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
               </div>
               {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
                 <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
@@ -1581,60 +1567,54 @@ const AppCard: FC<{
                 </span>
               ); })()}
             </div>
-
-            {/* Row 2: Language */}
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs text-gray-500">Deutsch</span>
+            {/* Zeile 2: Sprache */}
+            <div className="flex items-center gap-2 mb-1">
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
-                  <div key={i} className={`w-2.5 h-[5px] rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
+                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
                 ))}
               </div>
-              <span className="text-xs font-semibold text-gray-500">{nurse.language.level}</span>
+              <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
             </div>
-
-            {/* Row 3: Experience + assignments badge */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-[#9B1FA1]">{nurse.experience}</span>
-              {nurse.history && (
-                <span className="text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
-                  {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.
-                </span>
-              )}
-            </div>
+            {/* Zeile 3: Erfahrung + Einsätze in einer Zeile */}
+            <p className="text-sm text-gray-500">
+              <span className="font-semibold text-[#9B1FA1]">{nurse.experience}</span>
+              {nurse.history && <span> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
+            </p>
           </div>
-        </div>
-
-        {message && (
-          <div className="mt-3 bg-gray-50 rounded-xl px-3.5 py-3 text-xs text-gray-600 leading-relaxed border border-gray-100">
-            „{message}"
-          </div>
-        )}
-
-        {/* Cost strip */}
-        <div className="mt-3 bg-[#F5EDF6] rounded-xl px-3.5 py-2.5 border border-[#E8D0EA]">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-gray-500">Mtl. Betreuungskosten</span>
-            <span className="text-base font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</span>
-          </div>
-          <div className="h-px bg-[#E8D0EA] mb-1.5" />
-          <p className="text-xs text-gray-600 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Reisekosten á {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist}</p>
         </div>
       </div>
 
-      <div className="flex gap-2.5 px-4 pb-4">
-        <button
-          onClick={onReview}
-          className="flex-1 flex items-center justify-center gap-2 bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-xl py-3 text-sm font-semibold transition-all"
-        >
-          Angebot prüfen
-        </button>
+      {/* Cost + Message — Teil der Bewerbung, zusammen */}
+      <div className="border-t border-gray-100 px-5 py-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-700 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">Reisekosten á {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist}</p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-xs text-gray-500 mb-0.5">Mtl. Betreuungskosten</p>
+            <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
+          </div>
+        </div>
+        {message && (
+          <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 border-l-2 border-[#D8A9DC] pl-3">„{message}"</p>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between px-5 pb-5 pt-1">
         <button
           onClick={() => onDecline(app.id)}
-          className="flex-1 flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-xl py-3 text-sm font-semibold transition-all border border-red-100"
+          className="text-sm text-gray-400 hover:text-gray-600 font-medium transition-colors"
         >
           Ablehnen
+        </button>
+        <button
+          onClick={onReview}
+          className="bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-2xl px-6 py-3 text-sm font-semibold transition-all"
+        >
+          Angebot prüfen →
         </button>
       </div>
     </div>
@@ -1740,14 +1720,14 @@ const MatchCard: FC<{
       }`}
     >
       {/* Clickable nurse info */}
-      <div className="p-4 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
-        <div className="flex items-start gap-3">
+      <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
+        <div className="flex items-center gap-3">
           {/* Photo */}
           <div className="flex-shrink-0">
             {nurse.image ? (
-              <img src={nurse.image} alt={nurse.name} className="w-14 h-14 rounded-xl object-cover" />
+              <img src={nurse.image} alt={nurse.name} className="w-14 h-14 rounded-2xl object-cover" />
             ) : (
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold text-white"
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white"
                 style={{ backgroundColor: nurse.color }}>
                 {inits}
               </div>
@@ -1756,11 +1736,11 @@ const MatchCard: FC<{
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            {/* Row 1: Name + Age | Level badge */}
-            <div className="flex items-center justify-between gap-2 mb-1">
+            {/* Zeile 1: Name + Alter | Level-Badge */}
+            <div className="flex items-start justify-between gap-2 mb-1">
               <div className="flex items-baseline gap-1.5 min-w-0">
                 <span className="font-bold text-gray-900 leading-tight">{name}</span>
-                <span className="text-xs text-gray-500 flex-shrink-0">{nurse.age} J.</span>
+                <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
               </div>
               {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
                 <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
@@ -1769,27 +1749,20 @@ const MatchCard: FC<{
                 </span>
               ); })()}
             </div>
-
-            {/* Row 2: Language */}
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs text-gray-500">Deutsch</span>
+            {/* Zeile 2: Sprache */}
+            <div className="flex items-center gap-2 mb-1">
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
-                  <div key={i} className={`w-2.5 h-[5px] rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
+                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
                 ))}
               </div>
-              <span className="text-xs font-semibold text-gray-500">{nurse.language.level}</span>
+              <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
             </div>
-
-            {/* Row 3: Experience + assignments badge */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-[#9B1FA1]">{nurse.experience}</span>
-              {nurse.history && (
-                <span className="text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
-                  {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.
-                </span>
-              )}
-            </div>
+            {/* Zeile 3: Erfahrung + Einsätze in einer Zeile */}
+            <p className="text-sm text-gray-500">
+              <span className="font-semibold text-[#9B1FA1]">{nurse.experience}</span>
+              {nurse.history && <span> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
+            </p>
           </div>
         </div>
       </div>
@@ -1821,7 +1794,7 @@ const MatchCard: FC<{
         ) : (
           <button
             onClick={e => { e.stopPropagation(); handleInvite(); }}
-            className="text-xs font-bold bg-[#9B1FA1] text-white px-4 py-1.5 rounded-full hover:bg-[#7B1A85] transition-colors active:scale-95"
+            className="text-xs font-bold bg-[#F5EDF6] text-[#9B1FA1] border border-[#D8A9DC] px-4 py-1.5 rounded-full hover:bg-[#EDD9EF] transition-colors active:scale-95"
           >
             Einladen
           </button>
@@ -2134,25 +2107,14 @@ const AngebotPruefenModal: FC<{
   const [einsatzort, setEinsatzort] = useState('80331, München');
   const [telefon, setTelefon] = useState('');
   const [email, setEmail] = useState('');
-
-  // Kontaktperson
   const [kpAnrede, setKpAnrede] = useState('');
   const [kpVorname, setKpVorname] = useState('');
   const [kpNachname, setKpNachname] = useState('');
   const [kpTelefon, setKpTelefon] = useState('');
   const [kpEmail, setKpEmail] = useState('');
-
-  // AGB checkbox
   const [agbChecked, setAgbChecked] = useState(false);
-
-  const canAccept =
-    vorname.trim() !== '' &&
-    nachname.trim() !== '' &&
-    einsatzort.trim() !== '' &&
-    kpVorname.trim() !== '' &&
-    kpNachname.trim() !== '' &&
-    kpTelefon.trim() !== '' &&
-    agbChecked;
+  const canAccept = vorname.trim() !== '' && nachname.trim() !== '' && einsatzort.trim() !== ''
+    && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && agbChecked;
 
   // Monthly summary data (mock, based on offer)
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
@@ -2230,14 +2192,9 @@ const AngebotPruefenModal: FC<{
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-gray-900">{name}</p>
-                    <p className="text-sm text-gray-500">
-                      {nurse.age} J. · {nurse.experience} · Deutsch {nurse.language.level}
-                    </p>
+                    <p className="text-sm text-gray-500">{nurse.age} J. · {nurse.experience} · Deutsch {nurse.language.level}</p>
                   </div>
-                  <button
-                    onClick={() => onNurseClick(nurse)}
-                    className="text-sm font-semibold text-[#9B1FA1] hover:underline flex-shrink-0"
-                  >
+                  <button onClick={() => onNurseClick(nurse)} className="text-sm font-semibold text-[#9B1FA1] hover:underline flex-shrink-0">
                     Profil →
                   </button>
                 </div>
@@ -2271,9 +2228,7 @@ const AngebotPruefenModal: FC<{
                     ].map(row => (
                       <div key={row.label} className="flex items-center justify-between px-4 py-2.5 bg-white">
                         <span className="text-sm text-gray-500">{row.label}</span>
-                        <span className={`text-sm ${(row as any).bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
-                          {row.value}
-                        </span>
+                        <span className={`text-sm ${(row as any).bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.value}</span>
                       </div>
                     ))}
                   </div>
