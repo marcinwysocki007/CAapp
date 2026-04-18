@@ -1,7 +1,9 @@
 import CustomerPortalPage from './pages/CustomerPortalPage';
+import CustomerPortalPageClean from './pages/CustomerPortalPageClean';
 
 function App() {
-  return <CustomerPortalPage />;
+  const isClean = window.location.pathname === '/clean';
+  return isClean ? <CustomerPortalPageClean /> : <CustomerPortalPage />;
 }
 
 export default App;
