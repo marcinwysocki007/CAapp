@@ -2330,10 +2330,9 @@ const AngebotPruefenModal: FC<{
                 <div className="h-px bg-gray-100" />
 
                 {/* Summary box */}
-                <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-3">
-                  <p className="text-xs font-bold text-gray-700 mb-1">Zusammenfassung</p>
-                  <div className="flex items-center gap-3 pb-3 border-b border-gray-200">
-                    <div className="w-9 h-9 rounded-xl flex-shrink-0 overflow-hidden">
+                <div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden">
                       {nurse.image ? (
                         <img src={nurse.image} alt={nurse.name} className="w-full h-full object-cover" />
                       ) : (
@@ -2341,27 +2340,32 @@ const AngebotPruefenModal: FC<{
                       )}
                     </div>
                     <div>
-                      <p className="font-bold text-sm text-gray-900">{name}</p>
+                      <p className="text-sm font-bold text-gray-700">Zusammenfassung</p>
+                      <p className="text-sm text-gray-500">{name}</p>
                     </div>
                   </div>
-                  <div className="flex justify-between text-xs pb-3 border-b border-gray-200">
-                    <div><p className="text-gray-600 mb-0.5">Anreise</p><p className="font-semibold">{offer.anreisedatum}</p></div>
-                    <div className="text-right"><p className="text-gray-600 mb-0.5">Abreise</p><p className="font-semibold">{offer.abreisedatum}</p></div>
-                  </div>
-                  <div className="space-y-2">
+                  <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-white">
+                      <span className="text-sm text-gray-500">Anreise</span>
+                      <span className="text-sm font-semibold text-gray-700">{offer.anreisedatum}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-white">
+                      <span className="text-sm text-gray-500">Abreise</span>
+                      <span className="text-sm font-semibold text-gray-700">{offer.abreisedatum}</span>
+                    </div>
                     {summary.map(m => (
-                      <div key={m.monat}>
-                        <div className="flex justify-between text-xs font-bold text-gray-800 mb-0.5">
-                          <span>{m.monat}</span>
-                          <span>{m.betrag.toLocaleString('de-DE')} €</span>
+                      <div key={m.monat} className="px-4 py-2.5 bg-white">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-700">{m.monat}</span>
+                          <span className="text-sm font-bold text-gray-900">{m.betrag.toLocaleString('de-DE')} €</span>
                         </div>
                         {m.details.map(d => (
-                          <p key={d} className="text-xs text-gray-400 text-right">{d}</p>
+                          <p key={d} className="text-xs text-gray-400 text-right mt-0.5">{d}</p>
                         ))}
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-400">Reisekosten werden nach <em>halben Tag</em> berechnet. Provision ist im Monatspreis enthalten.</p>
+                  <p className="text-xs text-gray-400 mt-2 px-1">Reisekosten werden nach <em>halben Tag</em> berechnet. Provision ist im Monatspreis enthalten.</p>
                 </div>
 
                 {/* AGB Checkbox */}
