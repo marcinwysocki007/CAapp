@@ -628,7 +628,11 @@ const CustomSelect: FC<{
     if (!open) return;
     const close = () => setOpen(false);
     document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+    };
   }, [open]);
 
   return (
