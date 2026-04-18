@@ -1603,18 +1603,18 @@ const AppCard: FC<{
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2.5 px-5 pb-5">
-        <button
-          onClick={onReview}
-          className="flex-1 bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-2xl py-3.5 text-sm font-semibold transition-all"
-        >
-          Angebot prüfen
-        </button>
+      <div className="flex items-center justify-between px-5 pb-5 pt-1">
         <button
           onClick={() => onDecline(app.id)}
-          className="px-5 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-2xl py-3.5 text-sm font-semibold transition-all"
+          className="text-sm text-gray-400 hover:text-gray-600 font-medium transition-colors"
         >
           Ablehnen
+        </button>
+        <button
+          onClick={onReview}
+          className="bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-2xl px-6 py-3 text-sm font-semibold transition-all"
+        >
+          Angebot prüfen →
         </button>
       </div>
     </div>
@@ -1794,7 +1794,7 @@ const MatchCard: FC<{
         ) : (
           <button
             onClick={e => { e.stopPropagation(); handleInvite(); }}
-            className="text-xs font-bold bg-[#9B1FA1] text-white px-4 py-1.5 rounded-full hover:bg-[#7B1A85] transition-colors active:scale-95"
+            className="text-xs font-bold bg-[#F5EDF6] text-[#9B1FA1] border border-[#D8A9DC] px-4 py-1.5 rounded-full hover:bg-[#EDD9EF] transition-colors active:scale-95"
           >
             Einladen
           </button>
