@@ -1,4 +1,4 @@
-import { useState, FC } from 'react';
+import { useState, useEffect, FC } from 'react';
 import { Check, X, Bell, MapPin, Calendar, User, UserPlus, FileText, Euro, Clock, Plane, ChevronDown, Phone, AlertCircle, Shield, Users } from 'lucide-react';
 import { Nurse } from '../types';
 import { NURSES } from '../data/nurses';
@@ -142,6 +142,9 @@ const CustomerPortalPage: FC = () => {
   const [showContactPopup, setShowContactPopup] = useState(false);
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
+  const [patientSaved, setPatientSaved] = useState(false);
+  const [showPatientReminder, setShowPatientReminder] = useState(false);
+  const [triggerOpenPatient, setTriggerOpenPatient] = useState(false);
 
   const animateThenProcess = (id: string, fn: () => void) => {
     setExitingIds(prev => new Set([...prev, id]));
@@ -197,8 +200,12 @@ const CustomerPortalPage: FC = () => {
   };
 
   const inviteNurse = (idx: number, name: string) => {
+    const wasFirst = Object.values(nurseStatuses).filter(s => s === 'invited').length === 0;
     setNurseStatuses((prev) => ({ ...prev, [idx]: 'invited' }));
     showToast(`✓ ${name} wurde eingeladen!`);
+    if (wasFirst && !patientSaved) {
+      setTimeout(() => setShowPatientReminder(true), 400);
+    }
   };
 
   const declineNurse = (idx: number) => {
@@ -256,7 +263,7 @@ const CustomerPortalPage: FC = () => {
         </div>
 
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ── */}
-        <AngebotCard />
+        <AngebotCard onPatientSaved={setPatientSaved} triggerOpenPatient={triggerOpenPatient} onTriggerHandled={() => setTriggerOpenPatient(false)} />
 
         {/* ── Bewerbungsstatus ── */}
         {!hasPending ? (
@@ -401,6 +408,49 @@ const CustomerPortalPage: FC = () => {
 
       {/* Contact Popup */}
       {showContactPopup && <ContactPopup onClose={() => setShowContactPopup(false)} />}
+
+      {/* Patient Reminder Popup */}
+      {showPatientReminder && (
+        <>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]" onClick={() => setShowPatientReminder(false)} style={{ animation: 'fadeIn 0.2s ease-out' }} />
+          <div className="fixed inset-0 z-[70] flex items-end justify-center pointer-events-none" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+            <div className="bg-white w-full rounded-t-3xl pointer-events-auto shadow-2xl px-5 pt-5 pb-8 space-y-4" style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="flex justify-center mb-1">
+                <div className="w-10 h-1 rounded-full bg-gray-200" />
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0 text-xl">⚠️</div>
+                <div>
+                  <p className="text-base font-bold text-gray-900">Patientendaten fehlen noch</p>
+                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                    Super, die erste Pflegekraft wurde eingeladen! Damit sie sich optimal vorbereiten kann, brauchen wir noch Angaben zum Patienten und Haushalt.
+                  </p>
+                </div>
+              </div>
+              <div className="bg-[#FFF8E7] border border-amber-200 rounded-xl px-4 py-3">
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Ohne vollständige Patientendaten können Pflegekräfte keine fundierte Bewerbung einreichen — das verlangsamt den Prozess.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  onClick={() => { setShowPatientReminder(false); setTriggerOpenPatient(true); }}
+                  className="w-full bg-[#9B1FA1] text-white font-bold py-3.5 rounded-2xl text-sm hover:bg-[#7B1A85] transition-colors"
+                >
+                  Jetzt Patientendaten ausfüllen
+                </button>
+                <button
+                  onClick={() => setShowPatientReminder(false)}
+                  className="w-full text-gray-500 font-semibold py-2.5 text-sm"
+                >
+                  Später erledigen
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Decline Confirm Modal */}
       {declineConfirmApp && (
@@ -608,11 +658,24 @@ interface PatientForm {
 
 const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation'];
 
-const AngebotCard: FC = () => {
+const AngebotCard: FC<{
+  onPatientSaved?: (saved: boolean) => void;
+  triggerOpenPatient?: boolean;
+  onTriggerHandled?: () => void;
+}> = ({ onPatientSaved, triggerOpenPatient, onTriggerHandled }) => {
   const [angebotOpen, setAngebotOpen] = useState(false);
   const [patientOpen, setPatientOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (triggerOpenPatient) {
+      setAngebotOpen(false);
+      setPatientOpen(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      onTriggerHandled?.();
+    }
+  }, [triggerOpenPatient]);
   const [patient, setPatient] = useState<PatientForm>({
     anzahl: '',
     geschlecht:'', geburtsjahr:'', pflegegrad:'', gewicht:'', groesse:'',
@@ -1165,7 +1228,7 @@ const AngebotCard: FC = () => {
                   </button>
                 ) : (
                   <button
-                    onClick={() => { if (allComplete) { setSaved(true); setPatientOpen(false); }}}
+                    onClick={() => { if (allComplete) { setSaved(true); setPatientOpen(false); onPatientSaved?.(true); }}}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       allComplete
                         ? 'bg-[#9B1FA1] hover:bg-[#7B1A85] text-white'
