@@ -1583,23 +1583,23 @@ const AppCard: FC<{
             </p>
           </div>
         </div>
-
-        {/* Message */}
-        {message && (
-          <p className="mt-3 text-sm text-gray-500 leading-relaxed border-l-2 border-gray-200 pl-3 line-clamp-2">„{message}"</p>
-        )}
       </div>
 
-      {/* Cost section — klar abgetrennt */}
-      <div className="border-t border-gray-100 px-5 py-3.5 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-gray-400 mb-0.5">Mtl. Betreuungskosten</p>
-          <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
+      {/* Cost + Message — Teil der Bewerbung, zusammen */}
+      <div className="border-t border-gray-100 px-5 py-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <p className="text-xs text-gray-400 mb-0.5">Mtl. Betreuungskosten</p>
+            <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
+          </div>
+          <div className="text-right min-w-0">
+            <p className="text-xs text-gray-500 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
+            <p className="text-xs text-gray-400 mt-0.5 truncate">Reisekosten á {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist}</p>
+          </div>
         </div>
-        <div className="text-right min-w-0">
-          <p className="text-xs text-gray-500 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
-          <p className="text-xs text-gray-400 mt-0.5 truncate">Reisekosten á {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist}</p>
-        </div>
+        {message && (
+          <p className="text-sm text-gray-400 leading-relaxed line-clamp-2 border-l-2 border-gray-200 pl-3">„{message}"</p>
+        )}
       </div>
 
       {/* Actions */}
