@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, FC } from 'react';
 import { Check, X, Bell, MapPin, Calendar, User, UserPlus, FileText, Euro, Clock, Plane, ChevronDown, Phone, AlertCircle, Shield, Users } from 'lucide-react';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { Nurse } from '../types';
 import { NURSES } from '../data/nurses';
 
@@ -831,7 +832,7 @@ const AngebotCard: FC<{
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#9B1FA1] focus:ring-2 focus:ring-[#9B1FA1]/10 transition-all bg-white';
   const labelCls = 'block text-sm font-medium text-gray-500 mb-1.5';
 
-  const downloadPdf = () => {
+  const downloadPdf = async () => {
     const logoUrl = `${window.location.origin}/LOGO-PRIMUNDUS.png`;
 
     const html = `
@@ -940,23 +941,58 @@ const AngebotCard: FC<{
       </div>`;
 
     const el = document.createElement('div');
-    el.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;';
+    el.style.cssText = 'position:absolute;top:0;left:0;width:794px;z-index:-9999;opacity:0;pointer-events:none;';
     el.innerHTML = html;
     document.body.appendChild(el);
 
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    doc.html(el, {
-      callback: (pdf) => {
-        pdf.save('Primundus-Angebot.pdf');
-        document.body.removeChild(el);
-      },
-      x: 0,
-      y: 0,
-      width: 210,
-      windowWidth: 794,
-      margin: [0, 0, 0, 0],
-      autoPaging: 'text',
-    });
+    // Wait one frame so the browser renders the element (images etc.)
+    await new Promise(r => setTimeout(r, 200));
+
+    try {
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        width: 794,
+        windowWidth: 794,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      const pageW = doc.internal.pageSize.getWidth();   // 210 mm
+      const pageH = doc.internal.pageSize.getHeight();  // 297 mm
+      const canvasH = (canvas.height / canvas.width) * pageW;
+
+      if (canvasH <= pageH) {
+        // Fits on one page
+        doc.addImage(imgData, 'PNG', 0, 0, pageW, canvasH);
+      } else {
+        // Multi-page: slice canvas per page
+        const pxPerPage = (pageH / pageW) * canvas.width;
+        let remainingH = canvas.height;
+        let srcY = 0;
+        let firstPage = true;
+        while (remainingH > 0) {
+          const sliceH = Math.min(pxPerPage, remainingH);
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = canvas.width;
+          sliceCanvas.height = sliceH;
+          const ctx = sliceCanvas.getContext('2d')!;
+          ctx.drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+          const sliceImg = sliceCanvas.toDataURL('image/png');
+          if (!firstPage) doc.addPage();
+          doc.addImage(sliceImg, 'PNG', 0, 0, pageW, (sliceH / canvas.width) * pageW);
+          srcY += sliceH;
+          remainingH -= sliceH;
+          firstPage = false;
+        }
+      }
+
+      doc.save('Primundus-Angebot.pdf');
+    } finally {
+      document.body.removeChild(el);
+    }
   };
 
   return (
