@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: kundenportal
+    runtime: static
+    buildCommand: npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_SUPABASE_URL
+        value: https://ycdwtrklpoqprabtwahi.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZHd0cmtscG9xcHJhYnR3YWhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MjQwMTksImV4cCI6MjA4NzAwMDAxOX0.TN0T4yNwaZdF0BRpntVLQYvy6dr7KFqBjteNm8eKBvE
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
