@@ -744,6 +744,7 @@ const CustomSelect: FC<{
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const btnRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const handleOpen = () => {
     if (!open && btnRef.current) {
@@ -762,9 +763,10 @@ const CustomSelect: FC<{
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
-      if (btnRef.current && !btnRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inBtn = btnRef.current?.contains(target);
+      const inList = listRef.current?.contains(target);
+      if (!inBtn && !inList) setOpen(false);
     };
     const updatePos = () => {
       if (btnRef.current) {
@@ -794,12 +796,12 @@ const CustomSelect: FC<{
         <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div style={dropdownStyle} className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-y-auto max-h-48">
+        <div ref={listRef} style={dropdownStyle} className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-y-auto max-h-48">
           {options.map(opt => (
             <button
               key={opt}
               type="button"
-              onClick={e => { e.stopPropagation(); onChange(opt); setOpen(false); }}
+              onMouseDown={e => { e.preventDefault(); onChange(opt); setOpen(false); }}
               className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                 opt === value
                   ? 'bg-[#F5EDF6] text-[#9B1FA1] font-semibold'
