@@ -862,28 +862,29 @@ const AngebotCard: FC<{
   const [angebotOpen, setAngebotOpen] = useState(false);
   const [patientOpen, setPatientOpen] = useState(false);
   const [step, setStep] = useState(0);
-  const [saved, setSaved] = useState(false);
   const [priceInfo, setPriceInfo] = useState<string|null>(null);
 
-  useEffect(() => {
-    if (triggerOpenPatient) {
-      setAngebotOpen(false);
-      setPatientOpen(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      onTriggerHandled?.();
-    }
-  }, [triggerOpenPatient]);
+  // ─── localStorage key per lead/token ────────────────────────────────────────
+  const storageKey = lead?.token ? `patient_${lead.token}` : null;
+
+  // Load saved patient data from localStorage (or fall back to formularDaten prefill)
   const prefill = lead ? prefillPatientFromLead(lead) : {};
+  const savedData: Partial<PatientForm> = storageKey
+    ? (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } })()
+    : {};
+  const hasSavedData = storageKey ? !!localStorage.getItem(storageKey) : false;
+
+  const [saved, setSaved] = useState(hasSavedData);
   const [patient, setPatient] = useState<PatientForm>({
-    anzahl: prefill.anzahl ?? '1',
-    geschlecht:'', geburtsjahr:'', pflegegrad: prefill.pflegegrad ?? '', gewicht:'', groesse:'',
-    mobilitaet: prefill.mobilitaet ?? 'Rollstuhlfähig', heben:'', demenz:'', inkontinenz:'', nacht: prefill.nacht ?? 'Nein',
-    p2_geschlecht:'', p2_geburtsjahr:'', p2_pflegegrad:'', p2_gewicht:'', p2_groesse:'',
-    p2_mobilitaet:'', p2_heben:'', p2_demenz:'', p2_inkontinenz:'', p2_nacht:'',
-    diagnosen:'',
-    plz:'', ort:'', haushalt:'Ehepartner/in', wohnungstyp:'', urbanisierung:'', familieNahe:'', pflegedienst:'', internet:'',
-    tiere:'', unterbringung:'', aufgaben:'',
-    wunschGeschlecht: prefill.wunschGeschlecht ?? '', rauchen:'', sonstigeWuensche:'',
+    anzahl: savedData.anzahl ?? prefill.anzahl ?? '1',
+    geschlecht: savedData.geschlecht ?? '', geburtsjahr: savedData.geburtsjahr ?? '', pflegegrad: savedData.pflegegrad ?? prefill.pflegegrad ?? '', gewicht: savedData.gewicht ?? '', groesse: savedData.groesse ?? '',
+    mobilitaet: savedData.mobilitaet ?? prefill.mobilitaet ?? 'Rollstuhlfähig', heben: savedData.heben ?? '', demenz: savedData.demenz ?? '', inkontinenz: savedData.inkontinenz ?? '', nacht: savedData.nacht ?? prefill.nacht ?? 'Nein',
+    p2_geschlecht: savedData.p2_geschlecht ?? '', p2_geburtsjahr: savedData.p2_geburtsjahr ?? '', p2_pflegegrad: savedData.p2_pflegegrad ?? '', p2_gewicht: savedData.p2_gewicht ?? '', p2_groesse: savedData.p2_groesse ?? '',
+    p2_mobilitaet: savedData.p2_mobilitaet ?? '', p2_heben: savedData.p2_heben ?? '', p2_demenz: savedData.p2_demenz ?? '', p2_inkontinenz: savedData.p2_inkontinenz ?? '', p2_nacht: savedData.p2_nacht ?? '',
+    diagnosen: savedData.diagnosen ?? '',
+    plz: savedData.plz ?? '', ort: savedData.ort ?? '', haushalt: savedData.haushalt ?? 'Ehepartner/in', wohnungstyp: savedData.wohnungstyp ?? '', urbanisierung: savedData.urbanisierung ?? '', familieNahe: savedData.familieNahe ?? '', pflegedienst: savedData.pflegedienst ?? '', internet: savedData.internet ?? '',
+    tiere: savedData.tiere ?? '', unterbringung: savedData.unterbringung ?? '', aufgaben: savedData.aufgaben ?? '',
+    wunschGeschlecht: savedData.wunschGeschlecht ?? prefill.wunschGeschlecht ?? '', rauchen: savedData.rauchen ?? '', sonstigeWuensche: savedData.sonstigeWuensche ?? '',
   });
 
   const zwei = patient.anzahl === '2';
@@ -1726,7 +1727,7 @@ const AngebotCard: FC<{
                   </button>
                 ) : (
                   <button
-                    onClick={() => { if (allComplete) { setSaved(true); setPatientOpen(false); onPatientSaved?.(true); }}}
+                    onClick={() => { if (allComplete) { if (storageKey) localStorage.setItem(storageKey, JSON.stringify(patient)); setSaved(true); setPatientOpen(false); onPatientSaved?.(true); }}}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       allComplete
                         ? 'bg-[#9B1FA1] hover:bg-[#7B1A85] text-white'
