@@ -40,7 +40,10 @@ export async function mamamiaRequest<T>(opts: MamamiaRequestOptions): Promise<T>
   const json = (await res.json()) as GraphQLResponse<T>;
 
   if (json.errors && json.errors.length > 0) {
-    const msg = json.errors[0].message;
+    const first = json.errors[0];
+    const validation = (first.extensions as Record<string, unknown> | undefined)?.validation;
+    const detail = validation ? ` [${JSON.stringify(validation)}]` : "";
+    const msg = `${first.message}${detail}`;
     const err = new Error(msg);
     (err as Error & { graphqlErrors?: GraphQLError[] }).graphqlErrors = json.errors;
     throw err;

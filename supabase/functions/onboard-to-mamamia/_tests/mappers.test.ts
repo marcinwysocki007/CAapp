@@ -180,14 +180,18 @@ Deno.test("buildJobOfferTitle: missing nachname falls back to 'Primundus' + lead
 
 // ─── buildPatients ──────────────────────────────────────────────────────────
 
-Deno.test("buildPatients: weitere_personen=nein → single patient", () => {
+Deno.test("buildPatients: weitere_personen=nein → single patient (minimal payload)", () => {
   const patients = buildPatients(makeFormularDaten({ weitere_personen: "nein" }));
   assertEquals(patients.length, 1);
   assertEquals(patients[0].mobility_id, 4);
   assertEquals(patients[0].care_level, 3);
   assertEquals(patients[0].gender, "female");
-  assertEquals(patients[0].night_operations, "yes");
-  assertEquals(patients[0].dementia, "no");
+  // Minimal payload: optional fields omitted (Laravel rejects "yes"/"no").
+  // Patient form fills them later via UpdateCustomer with proper enum values.
+  assertEquals(patients[0].night_operations, undefined);
+  assertEquals(patients[0].dementia, undefined);
+  assertEquals(patients[0].incontinence, undefined);
+  assertEquals(patients[0].smoking, undefined);
 });
 
 Deno.test("buildPatients: weitere_personen=ja → 2 patients (second blank)", () => {

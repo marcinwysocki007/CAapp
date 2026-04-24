@@ -63,7 +63,7 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     const msg = (e as Error).message;
     // Expected: token errors → 401; everything else → 500
     const isTokenErr = /expired|invalid|nonexistent/i.test(msg);
-    console.error("onboard error:", msg); // Edge Function logs
+    console.error("onboard error:", msg, (e as Error).stack); // Edge Function logs
     return jsonError(isTokenErr ? 401 : 500, isTokenErr ? "invalid-token" : "onboarding failed", baseHeaders);
   }
 

@@ -76,17 +76,17 @@ export function buildJobOfferTitle(lead: Lead): string {
 }
 
 // ─── Build patients[] from formularDaten ────────────────────────────────────
+// For StoreCustomer we send ONLY the required subset + gender. Optional fields
+// like night_operations / dementia / incontinence / smoking have strict enum
+// validation in Laravel (exact values unknown; "yes"/"no" was rejected),
+// so we let Mamamia default them. Patient form later fills rest via UpdateCustomer.
 // weitere_personen=ja → 2 patients, second with minimal required fields
-// (mobility_id + care_level) to prevent StoreJobOffer crash.
+// (mobility_id + care_level) to prevent StoreJobOffer checkSuperJob3 crash.
 export function buildPatients(fd: FormularDaten): PatientInput[] {
   const first: PatientInput = {
     gender: mapGender(fd),
     care_level: mapCareLevel(fd),
     mobility_id: mapMobilityToId(fd),
-    dementia: mapDementia(fd),
-    night_operations: mapNightOperations(fd),
-    incontinence: false,
-    smoking: false,
   };
 
   const second: PatientInput | null = fd?.weitere_personen === "ja"
