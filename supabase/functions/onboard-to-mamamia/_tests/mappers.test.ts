@@ -59,8 +59,24 @@ Deno.test("mapMobilityToId: mobil → 1", () => {
   assertEquals(mapMobilityToId(makeFormularDaten({ mobilitaet: "mobil" })), 1);
 });
 
-Deno.test("mapMobilityToId: gehfaehig → 3 (Rollator)", () => {
+Deno.test("mapMobilityToId: gehstock → 2 (Walking stick)", () => {
+  assertEquals(mapMobilityToId(makeFormularDaten({ mobilitaet: "gehstock" })), 2);
+});
+
+Deno.test("mapMobilityToId: gehfaehig → 3 (Walker)", () => {
   assertEquals(mapMobilityToId(makeFormularDaten({ mobilitaet: "gehfaehig" })), 3);
+});
+
+Deno.test("mapMobilityToId: rollator → 3 (live formularDaten variant)", () => {
+  assertEquals(mapMobilityToId(makeFormularDaten({ mobilitaet: "rollator" })), 3);
+});
+
+Deno.test("mapMobilityToId: gehhilfe → 3 (synonym)", () => {
+  assertEquals(mapMobilityToId(makeFormularDaten({ mobilitaet: "gehhilfe" })), 3);
+});
+
+Deno.test("mapMobilityToId: case-insensitive (Rollator → 3)", () => {
+  assertEquals(mapMobilityToId(makeFormularDaten({ mobilitaet: "Rollator" })), 3);
 });
 
 Deno.test("mapMobilityToId: rollstuhl → 4", () => {
@@ -108,16 +124,30 @@ Deno.test("mapDementia: nein/no → 'no'", () => {
 
 // ─── mapNightOperations ─────────────────────────────────────────────────────
 
+// Enum values verified against Mamamia prod DB on 2026-04-27.
 Deno.test("mapNightOperations: nein → 'no'", () => {
   assertEquals(mapNightOperations(makeFormularDaten({ nachteinsaetze: "nein" })), "no");
 });
 
-Deno.test("mapNightOperations: gelegentlich → 'yes'", () => {
-  assertEquals(mapNightOperations(makeFormularDaten({ nachteinsaetze: "gelegentlich" })), "yes");
+Deno.test("mapNightOperations: gelegentlich → 'occasionally'", () => {
+  assertEquals(
+    mapNightOperations(makeFormularDaten({ nachteinsaetze: "gelegentlich" })),
+    "occasionally",
+  );
 });
 
-Deno.test("mapNightOperations: regelmaessig → 'yes'", () => {
-  assertEquals(mapNightOperations(makeFormularDaten({ nachteinsaetze: "regelmaessig" })), "yes");
+Deno.test("mapNightOperations: regelmaessig → 'up_to_1_time'", () => {
+  assertEquals(
+    mapNightOperations(makeFormularDaten({ nachteinsaetze: "regelmaessig" })),
+    "up_to_1_time",
+  );
+});
+
+Deno.test("mapNightOperations: taeglich → '1_2_times'", () => {
+  assertEquals(
+    mapNightOperations(makeFormularDaten({ nachteinsaetze: "taeglich" })),
+    "1_2_times",
+  );
 });
 
 Deno.test("mapNightOperations: missing → 'no'", () => {
@@ -134,8 +164,11 @@ Deno.test("mapGender: maennlich → 'male'", () => {
   assertEquals(mapGender(makeFormularDaten({ geschlecht: "maennlich" })), "male");
 });
 
-Deno.test("mapGender: egal/missing → null (unset, Mamamia handles)", () => {
-  assertEquals(mapGender(makeFormularDaten({ geschlecht: "egal" })), null);
+Deno.test("mapGender: egal → 'not_important' (verified prod enum)", () => {
+  assertEquals(mapGender(makeFormularDaten({ geschlecht: "egal" })), "not_important");
+});
+
+Deno.test("mapGender: missing → null", () => {
   assertEquals(mapGender({} as FormularDaten), null);
 });
 
@@ -151,8 +184,20 @@ Deno.test("computeArrivalDate: 1-2-wochen = now + 10 days", () => {
   assertEquals(computeArrivalDate("1-2-wochen", NOW_2026_04_23), "2026-05-03");
 });
 
+Deno.test("computeArrivalDate: 2-4-wochen = now + 21 days (live value)", () => {
+  assertEquals(computeArrivalDate("2-4-wochen", NOW_2026_04_23), "2026-05-14");
+});
+
 Deno.test("computeArrivalDate: 1-monat = now + 30 days", () => {
   assertEquals(computeArrivalDate("1-monat", NOW_2026_04_23), "2026-05-23");
+});
+
+Deno.test("computeArrivalDate: 1-2-monate = now + 45 days (live value)", () => {
+  assertEquals(computeArrivalDate("1-2-monate", NOW_2026_04_23), "2026-06-07");
+});
+
+Deno.test("computeArrivalDate: unklar = now + 30 days (live value)", () => {
+  assertEquals(computeArrivalDate("unklar", NOW_2026_04_23), "2026-05-23");
 });
 
 Deno.test("computeArrivalDate: spaeter = now + 60 days", () => {
@@ -180,18 +225,33 @@ Deno.test("buildJobOfferTitle: missing nachname falls back to 'Primundus' + lead
 
 // ─── buildPatients ──────────────────────────────────────────────────────────
 
-Deno.test("buildPatients: weitere_personen=nein → single patient (minimal payload)", () => {
+Deno.test("buildPatients: weitere_personen=nein → single patient with verified enums", () => {
   const patients = buildPatients(makeFormularDaten({ weitere_personen: "nein" }));
   assertEquals(patients.length, 1);
   assertEquals(patients[0].mobility_id, 4);
   assertEquals(patients[0].care_level, 3);
   assertEquals(patients[0].gender, "female");
-  // Minimal payload: optional fields omitted (Laravel rejects "yes"/"no").
-  // Patient form fills them later via UpdateCustomer with proper enum values.
-  assertEquals(patients[0].night_operations, undefined);
-  assertEquals(patients[0].dementia, undefined);
+  // Default fixture: nachteinsaetze="gelegentlich" → "occasionally".
+  assertEquals(patients[0].night_operations, "occasionally");
+  // dementia: default fixture has no demenz key → mapDementia returns "no".
+  assertEquals(patients[0].dementia, "no");
+  // incontinence/smoking still omitted — formularDaten doesn't carry them.
   assertEquals(patients[0].incontinence, undefined);
   assertEquals(patients[0].smoking, undefined);
+});
+
+Deno.test("buildPatients: rollator + taeglich (live formularDaten regression)", () => {
+  const patients = buildPatients(makeFormularDaten({
+    mobilitaet: "rollator",
+    nachteinsaetze: "taeglich",
+  }));
+  assertEquals(patients[0].mobility_id, 3);
+  assertEquals(patients[0].night_operations, "1_2_times");
+});
+
+Deno.test("buildPatients: dementia=ja propagates to patient[0]", () => {
+  const patients = buildPatients(makeFormularDaten({ demenz: "ja" }));
+  assertEquals(patients[0].dementia, "yes");
 });
 
 Deno.test("buildPatients: weitere_personen=ja → 2 patients (second blank)", () => {

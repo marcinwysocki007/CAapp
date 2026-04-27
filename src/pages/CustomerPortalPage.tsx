@@ -224,39 +224,45 @@ const CustomerPortalPage: FC = () => {
     return true;
   };
 
-  const confirmInviteNurse = (idx: number, name: string) => {
+  const confirmInviteNurse = async (idx: number, name: string): Promise<void> => {
     const match = effectiveMatched[idx];
-    const nurseName = match?.nurse.name ?? '';
-    setNurseStatuses((prev) => ({ ...prev, [idx]: 'invited' }));
-    // Mark matching application as invited (nurse applied after being invited)
-    if (nurseName) {
-      setApplications((prev) =>
-        prev.map((a) => a.nurse.name === nurseName ? { ...a, isInvited: true } : a)
-      );
+    if (!mmReady || typeof match?.caregiverId !== 'number') {
+      showToast('Einladung derzeit nicht möglich. Bitte später erneut versuchen.');
+      throw new Error('not-ready');
     }
-    showToast(`✓ ${name} wurde eingeladen!`);
+
+    const nurseName = match.nurse.name ?? '';
+
     if (!patientSaved && !firstInviteDone) {
       setFirstInviteDone(true);
       setShowPatientReminder(true);
     }
 
-    // Persist to Mamamia.
-    // TODO(K6): invite requires customer-scoped JWT (via RegisterCustomer +
-    // email verify flow, or ImpersonateCustomer with admin token).
-    // Current Primundus agency token gets Unauthorized from Mamamia.
-    // We keep the optimistic UI even on failure — user will see "invited" locally;
-    // real caregiver notification waits on customer auth flow in K6.
-    if (mmReady && typeof match?.caregiverId === 'number') {
-      inviteMutation.mutate({ caregiver_id: match.caregiverId }).catch(err => {
-        console.warn('inviteCaregiver not persisted (K6 customer-auth pending):', err.message);
-      });
+    try {
+      await inviteMutation.mutate({ caregiver_id: match.caregiverId });
+      // Persist invited state ONLY after backend confirmed.
+      setNurseStatuses((prev) => ({ ...prev, [idx]: 'invited' }));
+      if (nurseName) {
+        setApplications((prev) =>
+          prev.map((a) => a.nurse.name === nurseName ? { ...a, isInvited: true } : a)
+        );
+      }
+      showToast(`✓ ${name} wurde eingeladen!`);
+    } catch (err) {
+      // Surface the failure — no silent fallback (CLAUDE.md §1).
+      // Known limitation: SendInvitationCaregiver requires customer-scoped
+      // JWT (K6). Until that lands, this path fires and the user sees it.
+      console.error('inviteCaregiver failed:', (err as Error).message);
+      showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
+      throw err;
     }
   };
 
-  // Used by modal (calls after own animation)
+  // Used by modal (calls after own animation). Modal doesn't await — it just
+  // needs to know whether the gating check (patient reminder) passed.
   const inviteNurse = (idx: number, name: string): boolean => {
     if (!canInviteNurse(idx)) return false;
-    confirmInviteNurse(idx, name);
+    confirmInviteNurse(idx, name).catch(() => { /* already toasted */ });
     return true;
   };
 

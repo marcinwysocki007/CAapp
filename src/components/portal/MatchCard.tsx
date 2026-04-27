@@ -10,24 +10,30 @@ export const MatchCard: FC<{
   status: NurseStatus;
   onNurseClick: () => void;
   onInvite?: () => boolean;
-  onInviteConfirm?: () => void;
+  /** Performs the actual backend mutation. Spinner stays up until the
+   *  promise resolves; on rejection MatchCard rolls back to idle and the
+   *  parent surfaces the error (CLAUDE.md §1 — no fake "done" animation). */
+  onInviteConfirm?: () => Promise<void>;
 }> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     const allowed = onInvite ? onInvite() : true;
     if (!allowed) return;
     setInvitePhase('sending');
-    setTimeout(() => {
+    try {
+      await onInviteConfirm?.();
+      // Backend confirmed — show short success flash then hand off to
+      // status='invited' (rendered by parent on the next render cycle).
       setInvitePhase('done');
-      setTimeout(() => {
-        onInviteConfirm?.();
-        setInvitePhase('idle');
-      }, 2000);
-    }, 2000);
+      setTimeout(() => setInvitePhase('idle'), 1500);
+    } catch {
+      // Parent already shows the error toast and clears optimistic status.
+      setInvitePhase('idle');
+    }
   };
 
   return (

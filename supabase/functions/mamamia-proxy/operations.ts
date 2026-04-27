@@ -27,14 +27,28 @@ export const GET_CUSTOMER = /* GraphQL */ `
       first_name
       last_name
       email
+      phone
+      language_id
       location_id
       location_custom_text
       job_description
       arrival_at
       departure_at
       care_budget
+      gender
+      year_of_birth
       patients {
         id
+        gender
+        year_of_birth
+        care_level
+        mobility_id
+        weight
+        night_operations
+        dementia
+        incontinence
+        smoking
+        lift_id
       }
     }
   }

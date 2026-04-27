@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import { Check, X, UserPlus } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { nurseLevel, displayName, initials, mockProfile } from './shared';
+import { nurseLevel, displayName, initials } from './shared';
 
 export const CustomerNurseModal: FC<{
   nurse: Nurse;
@@ -12,29 +12,31 @@ export const CustomerNurseModal: FC<{
   onReview?: () => void;
   onDecline?: () => void;
   onUndo?: () => void;
-  onInvite?: () => void;
+  /** Performs the actual backend mutation. Spinner stays up until the
+   *  promise resolves; on rejection modal rolls back to idle and the
+   *  parent surfaces the error (CLAUDE.md §1 — no fake animation). */
+  onInvite?: () => Promise<void>;
   onDeclineMatch?: () => void;
   isInvited?: boolean;
 }> = ({ nurse, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
 
-  const handleModalInvite = () => {
+  const handleModalInvite = async () => {
     setInvitePhaseModal('sending');
-    setTimeout(() => {
+    try {
+      await onInvite?.();
       setInvitePhaseModal('done');
-      setTimeout(() => {
-        setInvited(true);
-        onInvite?.();
-        setInvitePhaseModal('idle');
-      }, 2000);
-    }, 2000);
+      setTimeout(() => { setInvited(true); setInvitePhaseModal('idle'); }, 1200);
+    } catch {
+      // Parent already shows the error toast.
+      setInvitePhaseModal('idle');
+    }
   };
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
   const avgWo = nurse.history ? Math.round(nurse.history.avgDurationMonths * 4.3) : 0;
-  const p = mockProfile(nurse);
   const lvl = nurseLevel(nurse.history?.assignments ?? 0);
 
   const InfoRow = ({ emoji, label, value, chips }: { emoji: string; label: string; value?: string; chips?: string[] }) => (

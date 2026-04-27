@@ -41,14 +41,20 @@ export interface Lead {
   mamamia_onboarded_at: string | null;
 }
 
-// Mamamia PatientInputType (matching live schema introspection)
+// Mamamia PatientInputType (verified vs prod DB read-only on 2026-04-27).
+// All enum values below are taken from the live distribution of patient rows.
 export interface PatientInput {
-  gender?: "male" | "female" | null;
+  gender?: "male" | "female" | "not_important" | null;
   year_of_birth?: number;
   care_level: number;       // required by Mamamia (1-5)
   mobility_id: number;      // required by Mamamia to prevent checkSuperJob3 crash
   dementia?: "yes" | "no";
-  night_operations?: "yes" | "no";
+  night_operations?:
+    | "no"
+    | "up_to_1_time"
+    | "1_2_times"
+    | "more_than_2"
+    | "occasionally";
   incontinence?: boolean;
   smoking?: boolean;
 }
