@@ -23,6 +23,9 @@ function makeDeps(fetchFn: typeof fetch): ActionDeps {
   return {
     endpoint: "https://beta.example/graphql",
     getAgencyToken: async () => "agency-token",
+    panelBaseUrl: "https://beta.example/backend",
+    agencyEmail: "primundus+portal@example.com",
+    agencyPassword: "secret-pass",
     fetchFn,
   };
 }
@@ -338,38 +341,85 @@ Deno.test("storeConfirmation: forbids cross-tenant", async () => {
 
 // ─── inviteCaregiver (K5/K6) ───────────────────────────────────────────
 
-Deno.test("inviteCaregiver: requires customer_token in session (K6 — agency token gets Unauthorized)", async () => {
-  const { fetchFn } = captureFetch({ data: { SendInvitationCaregiver: true } });
-  await assertRejects(
-    () => ACTIONS.inviteCaregiver(SESSION, { caregiver_id: 10053 }, makeDeps(fetchFn)),
-    Error,
-    "customer email not verified",
-  );
-});
-
-Deno.test("inviteCaregiver: uses session.customer_token as Bearer (NOT agency token)", async () => {
-  const sessionWithCustomerToken = { ...SESSION, customer_token: "31|customer-jwt-xyz" };
-  let capturedAuth = "";
-  const fetchFn: typeof fetch = async (_input, init) => {
-    const headers = (init as RequestInit | undefined)?.headers as Record<string, string> | undefined;
-    capturedAuth = String(headers?.["Authorization"] ?? "");
-    return new Response(JSON.stringify({ data: { SendInvitationCaregiver: true } }), { status: 200 });
+Deno.test("inviteCaregiver: panel-style flow — csrf → LoginAgency → ImpersonateCustomer → SendInvitationCaregiver", async () => {
+  // 4 sequential calls into the panel API.
+  const calls: { url: string; body?: string }[] = [];
+  let i = 0;
+  const responses: Array<{ status: number; json?: unknown; setCookie?: string[] }> = [
+    // 1. /backend/sanctum/csrf-cookie
+    { status: 204, setCookie: ["XSRF-TOKEN=t1; path=/", "mamamia_beta_session=s1; httponly"] },
+    // 2. LoginAgency
+    {
+      status: 200,
+      json: { data: { LoginAgency: { id: 8190, email: "primundus+portal@example.com" } } },
+      setCookie: ["XSRF-TOKEN=t2; path=/", "mamamia_beta_session=s2; httponly"],
+    },
+    // 3. ImpersonateCustomer
+    {
+      status: 200,
+      json: { data: { ImpersonateCustomer: { id: 8204, email: "customer@example.com" } } },
+      setCookie: ["XSRF-TOKEN=t3; path=/", "mamamia_beta_session=s3-customer; httponly"],
+    },
+    // 4. SendInvitationCaregiver — final
+    { status: 200, json: { data: { SendInvitationCaregiver: true } } },
+  ];
+  const fetchFn: typeof fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : (input as Request).url;
+    const body = typeof (init as RequestInit | undefined)?.body === "string"
+      ? (init as RequestInit).body as string : undefined;
+    calls.push({ url, body });
+    const r = responses[i++];
+    const headers = new Headers();
+    for (const sc of r.setCookie ?? []) headers.append("set-cookie", sc);
+    const status = r.status;
+    const bodyAllowed = status !== 204 && status !== 304;
+    return new Response(
+      bodyAllowed && r.json !== undefined ? JSON.stringify(r.json) : null,
+      { status, headers },
+    );
   };
-  await ACTIONS.inviteCaregiver(
-    sessionWithCustomerToken,
-    { caregiver_id: 10053 },
+
+  const result = await ACTIONS.inviteCaregiver(
+    SESSION,
+    { caregiver_id: 10061 },
     makeDeps(fetchFn),
   );
-  assertEquals(capturedAuth, "Bearer 31|customer-jwt-xyz");
+  assertEquals((result as { SendInvitationCaregiver: boolean }).SendInvitationCaregiver, true);
+
+  // Verify the call chain
+  assertEquals(calls.length, 4);
+  assertEquals(calls[0].url, "https://beta.example/backend/sanctum/csrf-cookie");
+  assertEquals(calls[1].url, "https://beta.example/backend/graphql/auth");
+  assertEquals(calls[2].url, "https://beta.example/backend/graphql/auth");
+  assertEquals(calls[3].url, "https://beta.example/backend/graphql");
+
+  // ImpersonateCustomer should have used SESSION.customer_id (ownership)
+  const impBody = JSON.parse(calls[2].body!);
+  assertEquals(impBody.operationName, "ImpersonateCustomer");
+  assertEquals(impBody.variables.customer_id, SESSION.customer_id);
+
+  // SendInvitationCaregiver carries caregiver_id from variables
+  const inviteBody = JSON.parse(calls[3].body!);
+  assertEquals(inviteBody.operationName, "SendInvitationCaregiver");
+  assertEquals(inviteBody.variables.caregiver_id, 10061);
 });
 
-Deno.test("inviteCaregiver: caregiver_id required (still validated when verified)", async () => {
-  const sessionWithCustomerToken = { ...SESSION, customer_token: "31|x" };
+Deno.test("inviteCaregiver: caregiver_id required", async () => {
   const { fetchFn } = captureFetch({ data: {} });
   await assertRejects(
-    () => ACTIONS.inviteCaregiver(sessionWithCustomerToken, {}, makeDeps(fetchFn)),
+    () => ACTIONS.inviteCaregiver(SESSION, {}, makeDeps(fetchFn)),
     Error,
     "caregiver_id required",
+  );
+});
+
+Deno.test("inviteCaregiver: missing panel config aborts before panel calls", async () => {
+  const { fetchFn } = captureFetch({ data: {} });
+  const deps = { ...makeDeps(fetchFn), panelBaseUrl: undefined };
+  await assertRejects(
+    () => ACTIONS.inviteCaregiver(SESSION, { caregiver_id: 10053 }, deps),
+    Error,
+    "panel auth not configured",
   );
 });
 

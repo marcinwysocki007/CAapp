@@ -1,4 +1,5 @@
 import { mamamiaRequest } from "../_shared/mamamiaClient.ts";
+import { loginAndImpersonate, panelMutateAsCustomer } from "../_shared/mamamiaPanelClient.ts";
 import type { ActionDeps, ActionHandler, ProxyAction, SessionPayload } from "./types.ts";
 import {
   GET_CAREGIVER,
@@ -240,14 +241,26 @@ const storeConfirmation: ActionHandler = async (session, variables, deps) => {
 const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
   const id = (variables as { caregiver_id?: unknown }).caregiver_id;
   if (typeof id !== "number") throw new Error("caregiver_id required");
-  // Mamamia gates SendInvitationCaregiver behind customer auth — agency
-  // token returns Unauthorized. Use the customer-scope JWT from session
-  // (set by /functions/v1/customer-verify after the magic-link click).
-  return await runGraphQLAsCustomer(
-    session.customer_token,
-    deps,
+  // Mamamia gates SendInvitationCaregiver behind a session that has been
+  // flipped to customer-mode via ImpersonateCustomer (verified live on beta
+  // 2026-04-27 — public /graphql/auth refuses our agency Bearer token, but
+  // the panel /backend/graphql + cookie session works for service-agency
+  // admins owning the customer).
+  if (!deps.panelBaseUrl || !deps.agencyEmail || !deps.agencyPassword) {
+    throw new Error("panel auth not configured");
+  }
+  const panelSession = await loginAndImpersonate(
+    { baseUrl: deps.panelBaseUrl, fetchFn: deps.fetchFn },
+    deps.agencyEmail,
+    deps.agencyPassword,
+    session.customer_id,
+  );
+  return await panelMutateAsCustomer(
+    { baseUrl: deps.panelBaseUrl, fetchFn: deps.fetchFn },
+    panelSession,
     SEND_INVITATION_CAREGIVER,
     { caregiver_id: id },
+    "SendInvitationCaregiver",
   );
 };
 

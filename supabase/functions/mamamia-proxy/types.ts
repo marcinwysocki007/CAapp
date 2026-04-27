@@ -22,6 +22,12 @@ export type ProxyAction =
 export interface ActionDeps {
   endpoint: string;
   getAgencyToken: () => Promise<string>;
+  /** Panel-style auth (Sanctum SPA) — used for ImpersonateCustomer +
+   *  customer-scoped mutations Mamamia gates behind the panel session.
+   *  See _shared/mamamiaPanelClient.ts. */
+  panelBaseUrl?: string;
+  agencyEmail?: string;
+  agencyPassword?: string;
   fetchFn?: typeof fetch;
 }
 

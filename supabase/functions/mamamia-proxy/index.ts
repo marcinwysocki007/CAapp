@@ -80,6 +80,10 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
 
   // Dispatch action
   try {
+    // Panel base URL = same host as Mamamia GraphQL but rooted at /backend.
+    // E.g. https://backend.beta.mamamia.app/graphql → derive panel as
+    // https://beta.mamamia.app/backend (the SPA's actual API origin).
+    const panelBaseUrl = derivePanelBaseUrl(deps.secrets.mamamiaEndpoint);
     const data = await ACTIONS[action](session, variables, {
       endpoint: deps.secrets.mamamiaEndpoint,
       getAgencyToken: () =>
@@ -89,6 +93,9 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
           password: deps.secrets.mamamiaAgencyPassword,
           fetchFn: deps.fetchFn,
         }),
+      panelBaseUrl,
+      agencyEmail: deps.secrets.mamamiaAgencyEmail,
+      agencyPassword: deps.secrets.mamamiaAgencyPassword,
       fetchFn: deps.fetchFn,
     });
 
@@ -116,6 +123,20 @@ function jsonError(status: number, message: string, extraHeaders: Record<string,
     status,
     headers: { ...extraHeaders, "Content-Type": "application/json" },
   });
+}
+
+// Backend GraphQL → SPA panel base URL. Mamamia hosts the panel at the
+// non-subdomain (beta.mamamia.app) under /backend, but its public GraphQL
+// API at backend.beta.mamamia.app. We strip the leading "backend." host
+// part and append /backend to the path.
+function derivePanelBaseUrl(graphqlEndpoint: string): string {
+  try {
+    const u = new URL(graphqlEndpoint);
+    const host = u.host.replace(/^backend\./, "");
+    return `${u.protocol}//${host}/backend`;
+  } catch {
+    return graphqlEndpoint;
+  }
 }
 
 // ─── Bootstrap (prod only) ─────────────────────────────────────────────────
