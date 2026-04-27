@@ -22,7 +22,6 @@ Deno.test("createSessionToken + verifySessionToken: round-trip works", async () 
   assertEquals(payload?.job_offer_id, 16225);
   assertEquals(payload?.lead_id, "aaaaaaaa-1111-2222-3333-aaaaaaaaaaaa");
   assertEquals(payload?.email, "test@example.com");
-  assertEquals(payload?.customer_token, undefined);
 });
 
 Deno.test("verifySessionToken: missing email returns null (K6 forces re-onboard)", async () => {
@@ -36,18 +35,6 @@ Deno.test("verifySessionToken: missing email returns null (K6 forces re-onboard)
   const jwt = await createSessionToken(legacyPayload, SECRET);
   const payload = await verifySessionToken(jwt, SECRET);
   assertEquals(payload, null);
-});
-
-Deno.test("verifySessionToken: round-trips customer_token when present", async () => {
-  const jwt = await createSessionToken({
-    customer_id: 7566,
-    job_offer_id: 16225,
-    lead_id: "x",
-    email: "test@example.com",
-    customer_token: "31|abcdef...",
-  }, SECRET);
-  const payload = await verifySessionToken(jwt, SECRET);
-  assertEquals(payload?.customer_token, "31|abcdef...");
 });
 
 Deno.test("verifySessionToken: wrong secret returns null", async () => {

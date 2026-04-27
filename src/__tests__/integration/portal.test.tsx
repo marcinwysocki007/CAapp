@@ -174,9 +174,9 @@ describe('Portal integration: golden paths', () => {
       }),
     );
 
-    // K6: simulate magic-link landing. Portal exchanges the verify_token
-    // for a customer-scope JWT before SendInvitationCaregiver can succeed.
-    setLocation(`?token=${TEST_LEAD_TOKEN}&verify_token=mock-magic-link`);
+    // Panel-style flow lives in the Edge Function — browser doesn't need
+    // to verify anything before clicking Einladen.
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 

@@ -62,9 +62,7 @@ export type ProxyAction =
   | 'updateCustomer'
   | 'rejectApplication'
   | 'storeConfirmation'
-  | 'inviteCaregiver'
-  // K6 — customer-scope auth bootstrap
-  | 'sendCustomerInvitation';
+  | 'inviteCaregiver';
 
 export async function callMamamia<T>(
   action: ProxyAction,
@@ -75,23 +73,4 @@ export async function callMamamia<T>(
     { action, variables },
   );
   return res.data;
-}
-
-// ─── K6 customer-verify ──────────────────────────────────────────────────
-
-export interface CustomerVerifyResponse {
-  verified: boolean;
-  customer_id: number;
-}
-
-/** Exchange a Mamamia magic-link token (delivered via the verify email) for
- *  a customer-scope JWT. The Edge Function sets a fresh session cookie
- *  including `customer_token`, so subsequent invite mutations succeed. */
-export async function verifyCustomerEmail(
-  magicToken: string,
-): Promise<CustomerVerifyResponse> {
-  return postJson<CustomerVerifyResponse>(
-    '/functions/v1/customer-verify',
-    { token: magicToken },
-  );
 }

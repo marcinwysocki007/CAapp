@@ -5,12 +5,9 @@ export interface SessionPayload {
   customer_id: number;
   job_offer_id: number;
   lead_id: string;
-  /** Customer email from Supabase lead — used for SendInvitationCustomer (K6).
-   *  Stored in JWT so the proxy never trusts client-supplied addresses. */
+  /** Customer email from Supabase lead. Kept in the signed JWT so the
+   *  proxy never trusts client-supplied addresses. (Originally added for
+   *  the K6 magic-link flow; the panel-style ImpersonateCustomer flow
+   *  doesn't need it but the field is still useful for bookings + audit.) */
   email: string;
-  /** Customer-scope JWT obtained via CustomerVerifyEmail (K6). Optional —
-   *  populated only after the customer clicks the magic-link verify mail.
-   *  Mutations that require customer scope (SendInvitationCaregiver) check
-   *  this and reject if absent. */
-  customer_token?: string;
 }

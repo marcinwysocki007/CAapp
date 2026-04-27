@@ -423,31 +423,3 @@ Deno.test("inviteCaregiver: missing panel config aborts before panel calls", asy
   );
 });
 
-// ─── sendCustomerInvitation (K6) ────────────────────────────────────────
-// Triggers Mamamia to email the customer a verify link. Once the customer
-// clicks it, we exchange the magic-link token for a customer-scope JWT
-// (CustomerVerifyEmail) — that JWT is what authorises SendInvitationCaregiver.
-
-Deno.test("sendCustomerInvitation: uses session.customer_id + session.email", async () => {
-  const { state, fetchFn } = captureFetch({
-    data: { SendInvitationCustomer: true },
-  });
-  await ACTIONS.sendCustomerInvitation(SESSION, {}, makeDeps(fetchFn));
-  const sent = state.body as { variables: { customer_id: number; email: string } };
-  assertEquals(sent.variables.customer_id, SESSION.customer_id);
-  assertEquals(sent.variables.email, SESSION.email);
-});
-
-Deno.test("sendCustomerInvitation: ignores user-supplied email/customer_id (ownership)", async () => {
-  const { state, fetchFn } = captureFetch({
-    data: { SendInvitationCustomer: true },
-  });
-  await ACTIONS.sendCustomerInvitation(
-    SESSION,
-    { customer_id: 9999, email: "evil@attacker.com" },
-    makeDeps(fetchFn),
-  );
-  const sent = state.body as { variables: { customer_id: number; email: string } };
-  assertEquals(sent.variables.customer_id, SESSION.customer_id);
-  assertEquals(sent.variables.email, SESSION.email);
-});
