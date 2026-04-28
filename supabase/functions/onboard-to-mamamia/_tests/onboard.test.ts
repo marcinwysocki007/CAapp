@@ -65,13 +65,29 @@ function makeFakeSupabase(initialLeads: Lead[] = []): FakeSupabase {
   };
 }
 
-// fetch fake for Mamamia GraphQL
-function fakeMamamia(responses: Array<object>): typeof fetch {
+// fetch fake for Mamamia GraphQL — also captures request bodies so tests
+// can assert the StoreCustomer payload shape.
+interface FakeMamamia {
+  fetch: typeof fetch;
+  // request bodies parsed from outgoing fetch() calls, in order
+  requests: Array<{ query: string; variables: Record<string, unknown> }>;
+}
+
+function fakeMamamia(responses: Array<object>): FakeMamamia {
   let i = 0;
-  return async () => {
-    const body = responses[i++];
-    if (!body) throw new Error(`fakeMamamia: unexpected call #${i}`);
-    return new Response(JSON.stringify(body), { status: 200 });
+  const requests: FakeMamamia["requests"] = [];
+  return {
+    requests,
+    fetch: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = responses[i++];
+      if (!body) throw new Error(`fakeMamamia: unexpected call #${i}`);
+      // capture outgoing body for assertion
+      try {
+        const parsed = JSON.parse((init?.body ?? "{}") as string);
+        requests.push({ query: parsed.query ?? "", variables: parsed.variables ?? {} });
+      } catch (_) { /* swallow — non-JSON body */ }
+      return new Response(JSON.stringify(body), { status: 200 });
+    }) as typeof fetch,
   };
 }
 
@@ -94,7 +110,7 @@ Deno.test("onboardLead: happy path — registers customer + joboffer, caches IDs
   const lead = makeLead();
   const supa = makeFakeSupabase([lead]);
 
-  const fetchFn = fakeMamamia([
+  const mm = fakeMamamia([
     // LoginAgency
     { data: { LoginAgency: { id: 8190, name: "Primundus", email: "x", token: "agency-jwt-xyz" } } },
     // StoreCustomer
@@ -107,7 +123,7 @@ Deno.test("onboardLead: happy path — registers customer + joboffer, caches IDs
     leadToken: "valid-token",
     secrets: SECRETS,
     supabase: supa,
-    fetchFn,
+    fetchFn: mm.fetch,
     now: NOW,
   });
 
@@ -121,6 +137,94 @@ Deno.test("onboardLead: happy path — registers customer + joboffer, caches IDs
   assertEquals(supa.updated[0].patch.mamamia_customer_id, 7566);
   assertEquals(supa.updated[0].patch.mamamia_job_offer_id, 16225);
   assertEquals(supa.updated[0].patch.mamamia_user_token, "agency-jwt-xyz");
+});
+
+Deno.test("onboardLead: StoreCustomer payload carries every must-fill field", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead]);
+
+  const mm = fakeMamamia([
+    { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
+    { data: { StoreCustomer: { id: 7566, customer_id: "ts-18-7566", status: "draft" } } },
+    { data: { StoreJobOffer: { id: 16225, job_offer_id: "ts-18-7566-1", title: "t", status: "search" } } },
+  ]);
+
+  await onboardLead({
+    leadToken: "valid-token",
+    secrets: SECRETS,
+    supabase: supa,
+    fetchFn: mm.fetch,
+    now: NOW,
+  });
+
+  // Second outgoing request is StoreCustomer (after LoginAgency)
+  const storeCustomerReq = mm.requests[1];
+  if (!storeCustomerReq) throw new Error("StoreCustomer request not captured");
+  const v = storeCustomerReq.variables;
+
+  // Identity
+  assertEquals(v.first_name, "hildegard");
+  assertEquals(v.last_name, "schmidt");
+  assertEquals(v.email, "frau@example.de");
+  assertEquals(v.phone, "+49 89 1234567");
+
+  // Customer-level enums (every 100%-fill column from active customers)
+  assertEquals(v.urbanization_id, 2);
+  assertEquals(v.language_id, 1);
+  assertEquals(v.visibility, "public");
+  assertEquals(v.accommodation, "single_family_house");
+  assertEquals(v.caregiver_accommodated, "room_premises");
+  assertEquals(v.has_family_near_by, "not_important");
+  assertEquals(v.internet, "yes");
+  assertEquals(v.pets, "no_information");
+  assertEquals(v.other_people_in_house, "no");
+  assertEquals(v.smoking_household, "no");
+  assertEquals(v.gender, "female"); // formularDaten.geschlecht=weiblich
+
+  // Panel form must-fill (verified vs customer 7579 screenshots)
+  assertEquals(v.equipment_ids, [1, 2, 8]);
+  assertEquals(v.day_care_facility, "no");
+
+  // Care budget mirrored
+  assertEquals(v.care_budget, 3200);
+  assertEquals(v.monthly_salary, 3200);
+
+  // Job description i18n — non-empty in all 4 locales
+  for (const k of ["job_description", "job_description_de", "job_description_en", "job_description_pl"]) {
+    const s = v[k];
+    if (typeof s !== "string" || s.length === 0) {
+      throw new Error(`expected ${k} to be non-empty string`);
+    }
+  }
+
+  // Nested input objects — each is sent as a real object, not a string.
+  const wish = v.customer_caregiver_wish as Record<string, unknown>;
+  if (!wish || typeof wish !== "object") throw new Error("wish must be an object");
+  assertEquals(wish.gender, "female");
+  assertEquals(wish.germany_skill, "level_3");
+
+  const contract = v.customer_contract as Record<string, unknown>;
+  assertEquals(contract.salutation, "Mrs.");
+  assertEquals(contract.first_name, "hildegard");
+  assertEquals(contract.is_same_as_first_patient, true);
+
+  const invoice = v.invoice_contract as Record<string, unknown>;
+  assertEquals(invoice.email, "frau@example.de");
+
+  const contacts = v.customer_contacts as Array<Record<string, unknown>>;
+  assertEquals(contacts.length, 1);
+  assertEquals(contacts[0].is_same_as_first_patient, true);
+
+  // Patients — first patient has all 100%-fill fields set
+  const patients = v.patients as Array<Record<string, unknown>>;
+  assertEquals(patients.length, 1);
+  assertEquals(patients[0].mobility_id, 4);   // rollstuhl
+  assertEquals(patients[0].care_level, 3);    // pflegegrad
+  assertEquals(patients[0].lift_id, 1);          // wheelchair → lift required
+  assertEquals(patients[0].tool_ids, [3, 7]);    // wheelchair → [Wheelchair, Others]
+  assertEquals(patients[0].weight, "61-70");
+  assertEquals(patients[0].height, "161-170");
 });
 
 Deno.test("onboardLead: cache hit — returns cached IDs without Mamamia calls", async () => {
@@ -164,7 +268,7 @@ Deno.test("onboardLead: expired lead token throws", async () => {
         leadToken: "valid-token",
         secrets: SECRETS,
         supabase: supa,
-        fetchFn: fakeMamamia([]),
+        fetchFn: fakeMamamia([]).fetch,
         now: NOW,
       }),
     Error,
@@ -182,7 +286,7 @@ Deno.test("onboardLead: missing token in Supabase throws", async () => {
         leadToken: "nonexistent",
         secrets: SECRETS,
         supabase: supa,
-        fetchFn: fakeMamamia([]),
+        fetchFn: fakeMamamia([]).fetch,
         now: NOW,
       }),
     Error,
@@ -195,7 +299,7 @@ Deno.test("onboardLead: Mamamia StoreCustomer error propagates", async () => {
   const lead = makeLead();
   const supa = makeFakeSupabase([lead]);
 
-  const fetchFn = fakeMamamia([
+  const mm = fakeMamamia([
     { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
     { errors: [{ message: "validation" }] }, // StoreCustomer fails
   ]);
@@ -206,7 +310,7 @@ Deno.test("onboardLead: Mamamia StoreCustomer error propagates", async () => {
         leadToken: "valid-token",
         secrets: SECRETS,
         supabase: supa,
-        fetchFn,
+        fetchFn: mm.fetch,
         now: NOW,
       }),
     Error,
@@ -222,7 +326,7 @@ Deno.test("onboardLead: null kalkulation lead still works (default patient)", as
   const lead = makeLead({ kalkulation: null });
   const supa = makeFakeSupabase([lead]);
 
-  const fetchFn = fakeMamamia([
+  const mm = fakeMamamia([
     { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
     { data: { StoreCustomer: { id: 1, customer_id: "ts-18-1", status: "draft" } } },
     { data: { StoreJobOffer: { id: 2, job_offer_id: "ts-18-1-1", title: "t", status: "search" } } },
@@ -232,7 +336,7 @@ Deno.test("onboardLead: null kalkulation lead still works (default patient)", as
     leadToken: "valid-token",
     secrets: SECRETS,
     supabase: supa,
-    fetchFn,
+    fetchFn: mm.fetch,
     now: NOW,
   });
 

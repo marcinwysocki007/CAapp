@@ -1,6 +1,10 @@
 import type { Lead, OnboardResult } from "./types.ts";
 import type { SessionPayload } from "../_shared/sessionTypes.ts";
-import { buildJobOfferTitle, buildPatients, computeArrivalDate } from "./mappers.ts";
+import {
+  buildCustomerInput,
+  buildJobOfferTitle,
+  computeArrivalDate,
+} from "./mappers.ts";
 import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClient.ts";
 
 // ─── Supabase-like interface (dependency injection for testability) ────────
@@ -33,17 +37,52 @@ export interface OnboardOptions {
 }
 
 // ─── GraphQL mutations ─────────────────────────────────────────────────────
+// Full StoreCustomer payload — every must-fill field plus the three
+// nested input types (CustomerCaregiverWishInputType,
+// CustomerContractInputType, CustomerContactInputType) so the customer
+// lands in a state that matches the prod active distribution.
+//
+// Field selection driven by docs/mamamia-customer-fields-map.md fill-rate
+// diff: every column at >=99% in active customers is set here.
 
 const STORE_CUSTOMER = /* GraphQL */ `
   mutation StoreCustomer(
-    $first_name: String, $last_name: String, $email: String,
-    $location_id: Int, $care_budget: Float,
-    $patients: [PatientInputType]
+    $first_name: String, $last_name: String, $email: String, $phone: String,
+    $location_id: Int, $urbanization_id: Int, $language_id: Int,
+    $equipment_ids: [Int], $day_care_facility: String,
+    $care_budget: Float, $monthly_salary: Float,
+    $visibility: String,
+    $accommodation: String, $caregiver_accommodated: String,
+    $has_family_near_by: String, $internet: String, $pets: String,
+    $is_pet_dog: Boolean, $is_pet_cat: Boolean, $is_pet_other: Boolean,
+    $other_people_in_house: String, $smoking_household: String,
+    $job_description: String, $job_description_de: String,
+    $job_description_en: String, $job_description_pl: String,
+    $gender: String,
+    $patients: [PatientInputType],
+    $customer_caregiver_wish: CustomerCaregiverWishInputType,
+    $customer_contract: CustomerContractInputType,
+    $invoice_contract: CustomerContractInputType,
+    $customer_contacts: [CustomerContactInputType]
   ) {
     StoreCustomer(
-      first_name: $first_name, last_name: $last_name, email: $email,
-      location_id: $location_id, care_budget: $care_budget,
-      patients: $patients
+      first_name: $first_name, last_name: $last_name, email: $email, phone: $phone,
+      location_id: $location_id, urbanization_id: $urbanization_id, language_id: $language_id,
+      equipment_ids: $equipment_ids, day_care_facility: $day_care_facility,
+      care_budget: $care_budget, monthly_salary: $monthly_salary,
+      visibility: $visibility,
+      accommodation: $accommodation, caregiver_accommodated: $caregiver_accommodated,
+      has_family_near_by: $has_family_near_by, internet: $internet, pets: $pets,
+      is_pet_dog: $is_pet_dog, is_pet_cat: $is_pet_cat, is_pet_other: $is_pet_other,
+      other_people_in_house: $other_people_in_house, smoking_household: $smoking_household,
+      job_description: $job_description, job_description_de: $job_description_de,
+      job_description_en: $job_description_en, job_description_pl: $job_description_pl,
+      gender: $gender,
+      patients: $patients,
+      customer_caregiver_wish: $customer_caregiver_wish,
+      customer_contract: $customer_contract,
+      invoice_contract: $invoice_contract,
+      customer_contacts: $customer_contacts
     ) { id customer_id status }
   }
 `;
@@ -102,10 +141,8 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
     fetchFn,
   });
 
-  // 5. StoreCustomer
-  const formularDaten = lead.kalkulation?.formularDaten ?? {};
-  const patients = buildPatients(formularDaten);
-  const careBudget = lead.kalkulation?.bruttopreis ?? null;
+  // 5. StoreCustomer — full payload (customer + wish + patients + contracts + contacts)
+  const customerInput = buildCustomerInput(lead);
 
   const customerResp = await mamamiaRequest<{
     StoreCustomer: { id: number; customer_id: string; status: string };
@@ -113,19 +150,12 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
     endpoint: secrets.mamamiaEndpoint,
     token: agencyToken,
     query: STORE_CUSTOMER,
-    variables: {
-      first_name: lead.vorname,
-      last_name: lead.nachname,
-      email: lead.email,
-      // location_id: TODO — wymaga lookup przez Locations(search); na MVP null
-      location_id: null,
-      care_budget: careBudget,
-      patients,
-    },
+    variables: customerInput as unknown as Record<string, unknown>,
     fetchFn,
   });
 
   const mamamiaCustomerId = customerResp.StoreCustomer.id;
+  const careBudget = lead.kalkulation?.bruttopreis ?? null;
 
   // 6. StoreJobOffer
   const arrivalAt = computeArrivalDate(lead.care_start_timing, now().toISOString());
