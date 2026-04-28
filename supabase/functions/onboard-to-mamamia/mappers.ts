@@ -156,24 +156,23 @@ export function mapLiftId(mobilityId: number): number {
 }
 
 // tool_ids: panel form "Jakie pomoce są dostępne?" is required, ship at
-// least one. Map from mobility — most common in active prod:
-//   wheelchair (4) → [3 Wheelchair, 7 Others]
-//   walker (3)     → [2 Rollator, 7 Others]
-//   walking-stick (2) → [1 Walking stick, 7 Others]
-//   bedridden (5)  → [4 Patient hoist, 6 Care bed, 7 Others]
-//   mobile (1)     → [7 Others]
+// least one. NEVER include id 7 (Others) — selecting "Inne" triggers a
+// required free-text field "Jakie inne narzędzia są używane?" which we
+// have no answer for. Use mobility-specific concrete tools only.
+//   bedridden (5)  → [4 Patient hoist, 6 Care bed]
+//   wheelchair (4) → [3 Wheelchair]
+//   walker (3)     → [2 Rollator]
+//   walking-stick (2) / mobile (1) → [1 Walking stick]
 export function mapToolIds(mobilityId: number): number[] {
   switch (mobilityId) {
     case 5:
-      return [4, 6, 7]; // Patient hoist, Care bed, Others
+      return [4, 6];
     case 4:
-      return [3, 7]; // Wheelchair, Others
+      return [3];
     case 3:
-      return [2, 7]; // Rollator, Others
-    case 2:
-      return [1, 7]; // Walking stick, Others
+      return [2];
     default:
-      return [7]; // Others
+      return [1];
   }
 }
 
@@ -429,9 +428,11 @@ export function buildCustomerInput(lead: Lead): CustomerInput {
     location_id: null,        // TODO: needs Locations(search) lookup — K-loc
     urbanization_id: 2,
     language_id: 1,
-    // Most popular set in active prod (1195 customers): Own TV +
-    // Own Bathroom + Others. 94% of active customers have at least one.
-    equipment_ids: [1, 2, 8],
+    // [1 Own TV, 2 Own Bathroom] — clean default without "Others"
+    // (id 8 triggers a required "Inne urządzenia" free-text field
+    // we have no answer for). 345 active customers in prod use
+    // exactly this pair; another 552 use [1] or [2] alone.
+    equipment_ids: [1, 2],
     day_care_facility: "no",
     care_budget: careBudget,
     monthly_salary: careBudget,

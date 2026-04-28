@@ -248,7 +248,7 @@ Deno.test("buildPatients: weitere_personen=nein → single patient with all 100%
   // - lift_id depends on mobility (rollstuhl=4 → lift_id=1 "Yes")
   // - panel form requires *_description fields, auto-text fills them
   assertEquals(patients[0].lift_id, 1);          // rollstuhl → lift required
-  assertEquals(patients[0].tool_ids, [3, 7]);    // wheelchair → [Wheelchair, Others]
+  assertEquals(patients[0].tool_ids, [3]);       // wheelchair only — never Others
   assertEquals(patients[0].weight, "61-70");
   assertEquals(patients[0].height, "161-170");
   assertEquals(patients[0].incontinence, false);
@@ -302,7 +302,7 @@ Deno.test("buildPatients: weitere_personen=ja → 2 patients (second is fully-pa
   assertEquals(patients[1].mobility_id, 1);
   assertEquals(patients[1].care_level, 2);
   assertEquals(patients[1].lift_id, 2);  // mobile → no lift
-  assertEquals(patients[1].tool_ids, [7]); // mobile → Others
+  assertEquals(patients[1].tool_ids, [1]); // mobile → Walking stick only (never Others)
   assertEquals(patients[1].weight, "61-70");
   assertEquals(patients[1].gender, "not_important");
 });
@@ -335,24 +335,23 @@ Deno.test("mapLiftId: mobile / walking-stick / walker → 2 (No)", () => {
   assertEquals(mapLiftId(3), 2);
 });
 
-Deno.test("mapToolIds: bedridden → patient hoist + care bed + others", () => {
-  assertEquals(mapToolIds(5), [4, 6, 7]);
+// NEVER include id 7 (Others) — selecting it triggers a required
+// "Jakie inne narzędzia są używane?" free-text we cannot fill.
+Deno.test("mapToolIds: bedridden → [Patient hoist, Care bed] (no Others)", () => {
+  assertEquals(mapToolIds(5), [4, 6]);
 });
 
-Deno.test("mapToolIds: wheelchair → wheelchair + others", () => {
-  assertEquals(mapToolIds(4), [3, 7]);
+Deno.test("mapToolIds: wheelchair → [Wheelchair] only", () => {
+  assertEquals(mapToolIds(4), [3]);
 });
 
-Deno.test("mapToolIds: walker → rollator + others", () => {
-  assertEquals(mapToolIds(3), [2, 7]);
+Deno.test("mapToolIds: walker → [Rollator] only", () => {
+  assertEquals(mapToolIds(3), [2]);
 });
 
-Deno.test("mapToolIds: walking-stick → walking-stick + others", () => {
-  assertEquals(mapToolIds(2), [1, 7]);
-});
-
-Deno.test("mapToolIds: mobile → others only", () => {
-  assertEquals(mapToolIds(1), [7]);
+Deno.test("mapToolIds: walking-stick / mobile → [Walking stick] only", () => {
+  assertEquals(mapToolIds(2), [1]);
+  assertEquals(mapToolIds(1), [1]);
 });
 
 // ─── mapSalutation ─────────────────────────────────────────────────────────
@@ -486,8 +485,9 @@ Deno.test("buildCustomerInput: every must-fill field is set for active-state cus
   assertEquals(input.smoking_household, "no");
   assertEquals(input.gender, "female");              // from formularDaten
 
-  // Panel form requires these — verified vs screenshots from customer 7579
-  assertEquals(input.equipment_ids, [1, 2, 8]);     // Own TV, Own Bath, Others
+  // Panel form requires these — verified vs screenshots from customer 7579/7580
+  // (NEVER pick "Others" id 8 — triggers required "Inne urządzenia" text)
+  assertEquals(input.equipment_ids, [1, 2]);        // Own TV, Own Bathroom
   assertEquals(input.day_care_facility, "no");
 
   // Care budget = bruttopreis (mirrored to monthly_salary)

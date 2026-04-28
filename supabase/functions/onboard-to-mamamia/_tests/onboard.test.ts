@@ -182,8 +182,9 @@ Deno.test("onboardLead: StoreCustomer payload carries every must-fill field", as
   assertEquals(v.smoking_household, "no");
   assertEquals(v.gender, "female"); // formularDaten.geschlecht=weiblich
 
-  // Panel form must-fill (verified vs customer 7579 screenshots)
-  assertEquals(v.equipment_ids, [1, 2, 8]);
+  // Panel form must-fill (verified vs customer 7580 screenshots) — never
+  // include Others (id 8) which triggers a required free-text field.
+  assertEquals(v.equipment_ids, [1, 2]);
   assertEquals(v.day_care_facility, "no");
 
   // Care budget mirrored
@@ -222,7 +223,7 @@ Deno.test("onboardLead: StoreCustomer payload carries every must-fill field", as
   assertEquals(patients[0].mobility_id, 4);   // rollstuhl
   assertEquals(patients[0].care_level, 3);    // pflegegrad
   assertEquals(patients[0].lift_id, 1);          // wheelchair → lift required
-  assertEquals(patients[0].tool_ids, [3, 7]);    // wheelchair → [Wheelchair, Others]
+  assertEquals(patients[0].tool_ids, [3]);       // wheelchair only — Others triggers required free-text
   assertEquals(patients[0].weight, "61-70");
   assertEquals(patients[0].height, "161-170");
 });
