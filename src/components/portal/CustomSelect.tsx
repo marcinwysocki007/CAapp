@@ -11,6 +11,7 @@ export const CustomSelect: FC<{
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const btnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleOpen = () => {
     if (!open && btnRef.current) {
@@ -28,8 +29,16 @@ export const CustomSelect: FC<{
 
   useEffect(() => {
     if (!open) return;
+    // Close on outside-click. Dropdown menu lives in a position:fixed
+    // overlay that is NOT inside btnRef, so we must check both refs —
+    // otherwise mousedown on an option fires this listener first,
+    // setOpen(false) unmounts the menu, and the option's onClick never
+    // gets dispatched (silent select bug).
     const close = (e: MouseEvent) => {
-      if (btnRef.current && !btnRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const inButton = btnRef.current?.contains(target);
+      const inDropdown = dropdownRef.current?.contains(target);
+      if (!inButton && !inDropdown) {
         setOpen(false);
       }
     };
@@ -61,7 +70,7 @@ export const CustomSelect: FC<{
         <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div style={dropdownStyle} className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-y-auto max-h-48">
+        <div ref={dropdownRef} style={dropdownStyle} className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-y-auto max-h-48">
           {options.map(opt => (
             <button
               key={opt}
