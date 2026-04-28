@@ -159,18 +159,35 @@ describe('prefillPatientFromLead', () => {
     expect(prefillPatientFromLead(bareLead)).toEqual({});
   });
 
-  it('maps weitere_personen=ja to anzahl=2', () => {
+  it("maps betreuung_fuer='ehepaar' to anzahl=2 (couple under care)", () => {
     const lead = {
       ...baseLead,
       kalkulation: {
         ...baseLead.kalkulation!,
         formularDaten: {
           ...baseLead.kalkulation!.formularDaten!,
-          weitere_personen: 'ja',
+          betreuung_fuer: 'ehepaar',
         },
       },
     };
     expect(prefillPatientFromLead(lead).anzahl).toBe('2');
+  });
+
+  it("ignores weitere_personen='ja' for anzahl (different semantic)", () => {
+    // weitere_personen = "are there OTHER people in the household".
+    // Only betreuung_fuer drives patient count.
+    const lead = {
+      ...baseLead,
+      kalkulation: {
+        ...baseLead.kalkulation!,
+        formularDaten: {
+          ...baseLead.kalkulation!.formularDaten!,
+          betreuung_fuer: '1-person',
+          weitere_personen: 'ja',
+        },
+      },
+    };
+    expect(prefillPatientFromLead(lead).anzahl).toBe('1');
   });
 
   it.each([

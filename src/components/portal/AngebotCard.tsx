@@ -570,7 +570,9 @@ export const AngebotCard: FC<{
                         <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
                       </div>
                     )}
-                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">1 Person</div>
+                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">
+                      {patient.anzahl === '2' ? '2 Personen' : '1 Person'}
+                    </div>
                   </div>
 
                   {/* Patient 1 */}
