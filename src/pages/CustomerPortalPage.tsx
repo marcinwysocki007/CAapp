@@ -268,18 +268,11 @@ const CustomerPortalPage: FC = () => {
       }
       showToast(`✓ ${name} wurde eingeladen!`);
     } catch (err) {
-      const msg = (err as Error).message;
-      console.error('inviteCaregiver failed:', msg);
-      // Mamamia returns Unauthorized when the customer record is still in
-      // 'draft' state (no patient_contract / customer_contacts / location).
-      // The patient-form save flow is what completes it; surface that
-      // hint so the user knows what to do next.
-      if (/Unauthorized|upstream/i.test(msg)) {
-        showToast('Bitte vervollständigen Sie zuerst die Patientendaten, um Pflegekräfte einzuladen.');
-        if (!patientSaved) setShowPatientReminder(true);
-      } else {
-        showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
-      }
+      console.error('inviteCaregiver failed:', (err as Error).message);
+      // Onboard now lands the customer at status='active' (Customer.arrival_at
+      // wired in 175468f), so the previous Unauthorized-for-draft branch is
+      // obsolete. Any error here is an upstream outage; show generic message.
+      showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
       throw err;
     }
   };

@@ -168,7 +168,18 @@ describe('Portal integration: golden paths', () => {
           listMatchings: () => ({ JobOfferMatchingsWithPagination: { total: 1, data: [sampleMatching] } }),
           inviteCaregiver: (vars) => {
             inviteCaregiverId = vars.caregiver_id as number;
-            return { SendInvitationCaregiver: true };
+            // Backend now returns the persisted Request row (StoreRequest
+            // mutation under panel-flow agency-only session). Match real
+            // proxy response shape so future readers see the truth.
+            return {
+              StoreRequest: {
+                id: 999,
+                caregiver_id: vars.caregiver_id as number,
+                job_offer_id: 16235,
+                message: null,
+                created_at: '2026-04-28T09:43:44.000000Z',
+              },
+            };
           },
         },
       }),

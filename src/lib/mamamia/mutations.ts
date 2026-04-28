@@ -86,10 +86,22 @@ export function useStoreConfirmation() {
   >('storeConfirmation');
 }
 
+// inviteCaregiver maps to mamamia-proxy → StoreRequest (panel-flow,
+// agency-only session). Optional `message` is forwarded to the
+// caregiver in the request notification. Backend returns the persisted
+// Request row so the UI can show "wysłano X" / track per-id.
+export interface RequestRow {
+  id: number;
+  caregiver_id: number;
+  job_offer_id: number;
+  message: string | null;
+  created_at: string;
+}
+
 export function useInviteCaregiver() {
   return useMamamiaMutation<
-    { caregiver_id: number },
-    { SendInvitationCaregiver: boolean }
+    { caregiver_id: number; message?: string },
+    { StoreRequest: RequestRow }
   >('inviteCaregiver');
 }
 
