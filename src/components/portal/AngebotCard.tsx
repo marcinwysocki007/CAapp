@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import { Check, ChevronDown, FileText, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -50,14 +50,21 @@ export const AngebotCard: FC<{
   // ─── localStorage key per lead/token ────────────────────────────────────────
   const storageKey = lead?.token ? `patient_${lead.token}` : null;
 
-  // Load saved patient data from localStorage (or fall back to formularDaten prefill)
+  // Load saved patient data from localStorage (or fall back to formularDaten prefill).
+  // localStorage now carries an `_isDraft` flag so partially-filled drafts
+  // (auto-saved on every field change) don't masquerade as a complete
+  // submission. Only `_isDraft: false` (set when user clicks the final
+  // "Daten speichern") flips the customer-portal "Patientendaten" card
+  // to its green-checked "Vollständig" state.
   const prefill = lead ? prefillPatientFromLead(lead) : {};
-  const savedData: Partial<PatientForm> = storageKey
+  const savedData: Partial<PatientForm> & { _isDraft?: boolean } = storageKey
     ? (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } })()
     : {};
-  const hasSavedData = storageKey ? !!localStorage.getItem(storageKey) : false;
+  const hasFinalSave = storageKey
+    ? !!localStorage.getItem(storageKey) && savedData._isDraft !== true
+    : false;
 
-  const [saved, setSaved] = useState(hasSavedData);
+  const [saved, setSaved] = useState(hasFinalSave);
   const [patient, setPatient] = useState<PatientForm>({
     anzahl: savedData.anzahl ?? prefill.anzahl ?? '1',
     geschlecht: savedData.geschlecht ?? '', geburtsjahr: savedData.geburtsjahr ?? '', pflegegrad: savedData.pflegegrad ?? prefill.pflegegrad ?? '', gewicht: savedData.gewicht ?? '', groesse: savedData.groesse ?? '',
@@ -71,6 +78,23 @@ export const AngebotCard: FC<{
   });
 
   const zwei = patient.anzahl === '2';
+
+  // Autosave draft on every patient field change so a user who navigates
+  // away mid-form (close tab / refresh / back-to-step-1) sees their
+  // existing answers when they return — instead of starting from the
+  // prefill again. Skip the initial mount so we don't write a fresh
+  // prefill into storage before the user actually touches anything.
+  // _isDraft=true marks the partial state; flipped to false by the
+  // explicit "Daten speichern" handler at the end of step 4/4.
+  const initialMountRef = useRef(true);
+  useEffect(() => {
+    if (!storageKey) return;
+    if (initialMountRef.current) { initialMountRef.current = false; return; }
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({ ...patient, _isDraft: !saved }),
+    );
+  }, [patient, storageKey, saved]);
 
   const set = (f: keyof PatientForm) =>
     (e: React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>) =>
@@ -919,8 +943,14 @@ export const AngebotCard: FC<{
                   <button
                     onClick={async () => {
                       if (!allComplete) return;
-                      // Always persist locally as draft first (instant UX on F5).
-                      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(patient));
+                      // Mark as final submission (not a draft) so reload
+                      // shows the green-checked "Vollständig" state.
+                      if (storageKey) {
+                        localStorage.setItem(
+                          storageKey,
+                          JSON.stringify({ ...patient, _isDraft: false }),
+                        );
+                      }
                       // Persist to Mamamia when session is live.
                       if (mamamiaEnabled && onSaveToMamamia) {
                         try {
