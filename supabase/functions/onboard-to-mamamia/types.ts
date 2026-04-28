@@ -149,6 +149,12 @@ export interface CustomerContractInput {
   last_name?: string;
   phone?: string;
   email?: string;
+  // Either location_id (preferred — comes from Locations(search) lookup)
+  // OR location_custom_text (fallback — mirrors the panel checkbox
+  // "Lokalizacja poza Niemcami / Wprowadź ręcznie"). One of these must
+  // be set or the panel form blocks Save with red "To pole jest wymagane".
+  location_id?: number;
+  location_custom_text?: string;
   street_number?: string;
   zip_code?: string;
   city?: string;

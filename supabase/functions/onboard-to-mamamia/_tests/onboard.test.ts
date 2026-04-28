@@ -322,6 +322,52 @@ Deno.test("onboardLead: Mamamia StoreCustomer error propagates", async () => {
   assertEquals(supa.updated.length, 0);
 });
 
+Deno.test("onboardLead: lead with PLZ in formularDaten → Locations(search) → location_id on contract", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead({
+    kalkulation: {
+      bruttopreis: 3200,
+      eigenanteil: 1700,
+      formularDaten: {
+        pflegegrad: 3,
+        mobilitaet: "rollstuhl",
+        nachteinsaetze: "gelegentlich",
+        geschlecht: "weiblich",
+        weitere_personen: "nein",
+        plz: "10115",
+      },
+    },
+  });
+  const supa = makeFakeSupabase([lead]);
+
+  const mm = fakeMamamia([
+    { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
+    // Locations(search: "10115") → Berlin
+    { data: { Locations: [{ id: 1148, zip_code: "10115", location: "Berlin", country_code: "DE" }] } },
+    { data: { StoreCustomer: { id: 9001, customer_id: "ts-18-9001", status: "draft" } } },
+    { data: { StoreJobOffer: { id: 9002, job_offer_id: "ts-18-9001-1", title: "t", status: "search" } } },
+  ]);
+
+  await onboardLead({
+    leadToken: "valid-token",
+    secrets: SECRETS,
+    supabase: supa,
+    fetchFn: mm.fetch,
+    now: NOW,
+  });
+
+  // Second outgoing request was the Locations query
+  const locReq = mm.requests[1];
+  if (!locReq) throw new Error("Locations request not captured");
+  assertEquals(locReq.variables.search, "10115");
+
+  // Third was StoreCustomer with location_id resolved on contract
+  const sc = mm.requests[2];
+  const contract = sc.variables.customer_contract as Record<string, unknown>;
+  assertEquals(contract.location_id, 1148);
+  assertEquals(contract.location_custom_text, undefined);
+});
+
 Deno.test("onboardLead: null kalkulation lead still works (default patient)", async () => {
   _resetAgencyTokenCache();
   const lead = makeLead({ kalkulation: null });

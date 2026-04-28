@@ -8,6 +8,7 @@ import {
   buildJobOfferTitle,
   buildPatients,
   computeArrivalDate,
+  extractPlzFromFormularDaten,
   mapCareLevel,
   mapDementia,
   mapGender,
@@ -418,6 +419,25 @@ Deno.test("buildCaregiverWish: missing gender → 'not_important' (prod-safe def
   assertEquals(wish.gender, "not_important");
 });
 
+// ─── extractPlzFromFormularDaten ───────────────────────────────────────────
+
+Deno.test("extractPlzFromFormularDaten: plz key (string)", () => {
+  assertEquals(extractPlzFromFormularDaten({ plz: "10115" } as FormularDaten), "10115");
+});
+
+Deno.test("extractPlzFromFormularDaten: postleitzahl key (number)", () => {
+  assertEquals(extractPlzFromFormularDaten({ postleitzahl: 80331 } as FormularDaten), "80331");
+});
+
+Deno.test("extractPlzFromFormularDaten: pads 4-digit PLZ to 5 (e.g. 1067 → 01067)", () => {
+  assertEquals(extractPlzFromFormularDaten({ plz: "1067" } as FormularDaten), "01067");
+});
+
+Deno.test("extractPlzFromFormularDaten: no PLZ → null", () => {
+  assertEquals(extractPlzFromFormularDaten({} as FormularDaten), null);
+  assertEquals(extractPlzFromFormularDaten({ plz: "abc" } as FormularDaten), null);
+});
+
 // ─── buildContractFromLead / buildContactsFromLead ─────────────────────────
 
 Deno.test("buildContractFromLead: lead → invoice/main contract with patient role", () => {
@@ -430,6 +450,16 @@ Deno.test("buildContractFromLead: lead → invoice/main contract with patient ro
   assertEquals(contract.last_name, "von norman");
   assertEquals(contract.email, "frau@example.de");
   assertEquals(contract.phone, "+49 89 1234567");
+  // Without locationId → manual-entry fallback (mirrors panel checkbox)
+  assertEquals(contract.location_id, undefined);
+  assertEquals(contract.location_custom_text, "Wird vom Kunden ergänzt");
+});
+
+Deno.test("buildContractFromLead: with locationId → uses dropdown id, no custom_text", () => {
+  const lead = makeLead();
+  const contract = buildContractFromLead(lead, 1148);
+  assertEquals(contract.location_id, 1148);
+  assertEquals(contract.location_custom_text, undefined);
 });
 
 Deno.test("buildContactsFromLead: returns single contact mirroring lead", () => {
@@ -533,4 +563,22 @@ Deno.test("buildCustomerInput: null kalkulation → defaults preserved (no crash
   assertEquals(input.urbanization_id, 2);
   assertEquals(input.patients.length, 1);
   assertEquals(input.other_people_in_house, "no");
+});
+
+Deno.test("buildCustomerInput: locationId arg propagates to customer + both contracts", () => {
+  const lead = makeLead();
+  const input = buildCustomerInput(lead, 1148);
+  assertEquals(input.location_id, 1148);
+  assertEquals(input.customer_contract?.location_id, 1148);
+  assertEquals(input.invoice_contract?.location_id, 1148);
+  // No custom_text fallback when location_id is supplied
+  assertEquals(input.customer_contract?.location_custom_text, undefined);
+});
+
+Deno.test("buildCustomerInput: no locationId → contracts carry custom_text fallback", () => {
+  const lead = makeLead();
+  const input = buildCustomerInput(lead);
+  assertEquals(input.location_id, null);
+  assertEquals(input.customer_contract?.location_custom_text, "Wird vom Kunden ergänzt");
+  assertEquals(input.invoice_contract?.location_custom_text, "Wird vom Kunden ergänzt");
 });

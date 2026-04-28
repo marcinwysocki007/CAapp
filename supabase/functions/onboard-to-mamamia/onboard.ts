@@ -4,6 +4,7 @@ import {
   buildCustomerInput,
   buildJobOfferTitle,
   computeArrivalDate,
+  extractPlzFromFormularDaten,
 } from "./mappers.ts";
 import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClient.ts";
 
@@ -87,6 +88,40 @@ const STORE_CUSTOMER = /* GraphQL */ `
   }
 `;
 
+const LOCATIONS_QUERY = /* GraphQL */ `
+  query Locations($search: String!) {
+    Locations(search: $search) { id zip_code location country_code }
+  }
+`;
+
+// Resolve a Mamamia location_id from a German PLZ. Returns null if no
+// match or no PLZ supplied — caller falls back to location_custom_text.
+async function lookupLocationId(args: {
+  endpoint: string;
+  token: string;
+  plz: string | null;
+  fetchFn: typeof fetch;
+}): Promise<number | null> {
+  if (!args.plz) return null;
+  try {
+    const r = await mamamiaRequest<{
+      Locations: Array<{ id: number; zip_code: string; location: string; country_code: string }>;
+    }>({
+      endpoint: args.endpoint,
+      token: args.token,
+      query: LOCATIONS_QUERY,
+      variables: { search: args.plz },
+      fetchFn: args.fetchFn,
+    });
+    // Prefer DE matches; otherwise take the first.
+    const de = r.Locations.find(l => l.country_code === "DE");
+    return (de ?? r.Locations[0])?.id ?? null;
+  } catch (_) {
+    // Lookup failure is non-fatal — fallback to custom_text.
+    return null;
+  }
+}
+
 const STORE_JOB_OFFER = /* GraphQL */ `
   mutation StoreJobOffer(
     $customer_id: Int, $service_agency_id: Int,
@@ -141,8 +176,17 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
     fetchFn,
   });
 
-  // 5. StoreCustomer — full payload (customer + wish + patients + contracts + contacts)
-  const customerInput = buildCustomerInput(lead);
+  // 5. Resolve location_id from formularDaten.plz (best-effort).
+  const plz = extractPlzFromFormularDaten(lead.kalkulation?.formularDaten ?? {});
+  const locationId = await lookupLocationId({
+    endpoint: secrets.mamamiaEndpoint,
+    token: agencyToken,
+    plz,
+    fetchFn,
+  });
+
+  // 6. StoreCustomer — full payload (customer + wish + patients + contracts + contacts)
+  const customerInput = buildCustomerInput(lead, locationId);
 
   const customerResp = await mamamiaRequest<{
     StoreCustomer: { id: number; customer_id: string; status: string };

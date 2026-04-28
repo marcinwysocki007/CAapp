@@ -351,12 +351,38 @@ export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
   };
 }
 
+// ─── Extract PLZ from formularDaten ────────────────────────────────────────
+// Primundus calculator stores the customer's German postal code under
+// various keys (the schema is loose). Try the most common ones.
+export function extractPlzFromFormularDaten(fd: FormularDaten): string | null {
+  const candidates = ["plz", "postleitzahl", "postal_code", "zip", "zip_code"];
+  for (const k of candidates) {
+    const v = fd?.[k];
+    if (typeof v === "string" && /^\d{4,5}$/.test(v.trim())) {
+      return v.trim().padStart(5, "0");
+    }
+    if (typeof v === "number" && v >= 1000 && v <= 99999) {
+      return String(v).padStart(5, "0");
+    }
+  }
+  return null;
+}
+
 // ─── Customer-level contract & contacts (invoice + main) ────────────────────
 // For a Primundus lead the lead's contact data IS the patient-payer-contact
 // triple — use is_same_as_first_patient on contacts to express that we've
 // merged the roles. Patient form will split them later if needed.
-export function buildContractFromLead(lead: Lead): CustomerContractInput {
-  return {
+//
+// `location_id` is required for the panel form's "Lokalizacja opieki"
+// dropdown. We resolve it via Locations(search: PLZ) BEFORE building the
+// contract; if the lead carries no PLZ, we set location_custom_text as
+// the manual-entry fallback (mirrors the panel checkbox "Lokalizacja
+// poza Niemcami / Wprowadź ręcznie").
+export function buildContractFromLead(
+  lead: Lead,
+  locationId: number | null = null,
+): CustomerContractInput {
+  const base: CustomerContractInput = {
     contact_type: "patient",
     is_same_as_first_patient: true,
     salutation: mapSalutation(lead.anrede),
@@ -365,6 +391,14 @@ export function buildContractFromLead(lead: Lead): CustomerContractInput {
     phone: lead.telefon ?? undefined,
     email: lead.email,
   };
+  if (locationId !== null) {
+    base.location_id = locationId;
+  } else {
+    // Manual-entry fallback. Panel form accepts non-empty string here
+    // and skips the dropdown validation.
+    base.location_custom_text = "Wird vom Kunden ergänzt";
+  }
+  return base;
 }
 
 export function buildContactsFromLead(lead: Lead): CustomerContactInput[] {
@@ -415,7 +449,10 @@ export function buildJobDescription(fd: FormularDaten): {
 // urbanization_id default = 2 ("City") — most-common in lookup/usage.
 // language_id = 1 — German (default for Primundus market).
 // visibility = "public" — most-common in prod.
-export function buildCustomerInput(lead: Lead): CustomerInput {
+export function buildCustomerInput(
+  lead: Lead,
+  locationId: number | null = null,
+): CustomerInput {
   const fd = lead.kalkulation?.formularDaten ?? {};
   const careBudget = lead.kalkulation?.bruttopreis ?? null;
   const desc = buildJobDescription(fd);
@@ -425,7 +462,10 @@ export function buildCustomerInput(lead: Lead): CustomerInput {
     last_name: lead.nachname,
     email: lead.email,
     phone: lead.telefon,
-    location_id: null,        // TODO: needs Locations(search) lookup — K-loc
+    // Customer-level location — same as contract (resolved by caller via
+    // Locations(search: PLZ)). When PLZ unknown we leave it null and let
+    // the contract carry location_custom_text fallback.
+    location_id: locationId,
     urbanization_id: 2,
     language_id: 1,
     // [1 Own TV, 2 Own Bathroom] — clean default without "Others"
@@ -454,8 +494,8 @@ export function buildCustomerInput(lead: Lead): CustomerInput {
     gender: mapGender(fd) ?? "not_important",
     patients: buildPatients(fd),
     customer_caregiver_wish: buildCaregiverWish(fd),
-    customer_contract: buildContractFromLead(lead),
-    invoice_contract: buildContractFromLead(lead),
+    customer_contract: buildContractFromLead(lead, locationId),
+    invoice_contract: buildContractFromLead(lead, locationId),
     customer_contacts: buildContactsFromLead(lead),
   };
 }
