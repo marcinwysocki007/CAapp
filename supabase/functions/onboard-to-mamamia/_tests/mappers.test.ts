@@ -667,6 +667,17 @@ Deno.test("buildContractFromLead patient address fields propagate from patient_*
   assertEquals(contract.city, "Berlin");
 });
 
+Deno.test("buildContractFromLead drops street_number when shorter than 3 chars (Mamamia min-len)", () => {
+  // Mamamia rejects street_number with <3 chars. Skip the field rather
+  // than letting the whole UpdateCustomer/StoreCustomer call fail.
+  const c1 = buildContractFromLead(makeLead({ patient_street: "X" }), 1148, "patient");
+  assertEquals(c1.street_number, undefined);
+  const c2 = buildContractFromLead(makeLead({ patient_street: "  AB " }), 1148, "patient");
+  assertEquals(c2.street_number, undefined);
+  const c3 = buildContractFromLead(makeLead({ patient_street: "ABC" }), 1148, "patient");
+  assertEquals(c3.street_number, "ABC");
+});
+
 Deno.test("buildContactsFromLead: patient ≠ contact → is_same_as_first_patient=false", () => {
   const lead = makeLead({
     vorname: "Michał",

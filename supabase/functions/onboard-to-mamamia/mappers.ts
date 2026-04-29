@@ -580,7 +580,13 @@ export function buildContractFromLead(
   // Use patient_street fields for both contracts when present — care
   // location is shared between patient + invoice contact in the
   // Primundus billing model.
-  if (lead.patient_street) base.street_number = lead.patient_street;
+  // Mamamia rejects street_number with fewer than 3 characters
+  // ("X" fails validation). Skip the field when too short instead of
+  // letting the whole StoreCustomer/UpdateCustomer call fail — the
+  // panel will show the row as missing and SA can correct it. Trim
+  // whitespace before counting.
+  const street = (lead.patient_street ?? "").trim();
+  if (street.length >= 3) base.street_number = street;
   if (lead.patient_zip) base.zip_code = lead.patient_zip;
   if (lead.patient_city) base.city = lead.patient_city;
 
