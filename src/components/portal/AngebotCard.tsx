@@ -118,18 +118,40 @@ export const AngebotCard: FC<{
 
   const zwei = patient.anzahl === '2';
 
+  // userDirty — set ONLY by user-driven setPatient (set() / CustomSelect
+  // onChange wrappers below). Programmatic merges (mm-rehydrate) leave
+  // this false, so they don't masquerade as "user is editing".
+  //
+  // Why: previously we treated every render as potentially user-edited
+  // and autosaved the patient state with _isDraft=true. That wrote a
+  // pristine snapshot to localStorage on first mount (before mmCustomer
+  // arrived), then flagged it as a draft — blocking the subsequent
+  // mm-rehydrate from filling Geschlecht / Pflegegrad / etc., because
+  // the rehydrate refused to overwrite "user-edited" data.
+  const userDirty = useRef(false);
+
+  // updatePatient — wrap setPatient for user actions. Never call this
+  // from programmatic effects.
+  const updatePatient = (updater: (prev: PatientForm) => PatientForm) => {
+    userDirty.current = true;
+    setPatient(updater);
+  };
+
   // Re-hydrate patient state when mmCustomer arrives async (after the
-  // initial render with mmCustomer=null). We skip this when:
-  //   - localStorage has a true draft (`_isDraft: true`) — user is in
-  //     the middle of editing, must not stomp.
-  //   - we've already merged once for this customer (fingerprint guard).
-  // Per-field merge: only fill blanks (so any edits the user made
-  // BEFORE mmCustomer arrived survive).
+  // initial render with mmCustomer=null). Skip cases:
+  //   - userDirty.current — user is mid-edit in this session, must not
+  //     stomp.
+  //   - already merged for this customer.id (fingerprint guard).
+  //
+  // Per-field merge fills blanks AND known-default seed values
+  // (Rollstuhlfähig / Nein / Ehepartner/in / "3" pure-digit pflegegrad),
+  // so Mamamia's "Pflegegrad 3" correctly replaces the calculator's
+  // "3" stub.
   const mmMergedFor = useRef<number | null>(null);
   useEffect(() => {
     if (!mmCustomer) return;
     if (mmMergedFor.current === mmCustomer.id) return;
-    if (savedData._isDraft === true) {
+    if (userDirty.current) {
       mmMergedFor.current = mmCustomer.id;
       return;
     }
@@ -144,7 +166,10 @@ export const AngebotCard: FC<{
         const isDefault = (cur === '' || cur == null)
           || (k === 'mobilitaet' && cur === 'Rollstuhlfähig')
           || (k === 'nacht' && cur === 'Nein')
-          || (k === 'haushalt' && cur === 'Ehepartner/in');
+          || (k === 'haushalt' && cur === 'Ehepartner/in')
+          // calculator prefill stores raw digit "3"; Mamamia "Pflegegrad 3"
+          // is the proper UI label — let it win over the bare digit.
+          || (k === 'pflegegrad' && /^\d$/.test(cur ?? ''));
         if (isDefault) {
           (next as unknown as Record<string, string>)[k] = v as string;
           changed = true;
@@ -158,14 +183,14 @@ export const AngebotCard: FC<{
   // Autosave draft on every patient field change so a user who navigates
   // away mid-form (close tab / refresh / back-to-step-1) sees their
   // existing answers when they return — instead of starting from the
-  // prefill again. Skip the initial mount so we don't write a fresh
-  // prefill into storage before the user actually touches anything.
-  // _isDraft=true marks the partial state; flipped to false by the
-  // explicit "Daten speichern" handler at the end of step 4/4.
+  // prefill again. Only writes when the user has actually edited
+  // something; pristine state never reaches localStorage (which avoided
+  // the previous bug where mount-time autosave shadowed mm-rehydrate).
   const initialMountRef = useRef(true);
   useEffect(() => {
     if (!storageKey) return;
     if (initialMountRef.current) { initialMountRef.current = false; return; }
+    if (!userDirty.current && !saved) return;
     localStorage.setItem(
       storageKey,
       JSON.stringify({ ...patient, _isDraft: !saved }),
@@ -174,7 +199,7 @@ export const AngebotCard: FC<{
 
   const set = (f: keyof PatientForm) =>
     (e: React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>) =>
-      setPatient(p => ({ ...p, [f]: e.target.value }));
+      updatePatient(p => ({ ...p, [f]: e.target.value }));
 
   const stepComplete = (s: number): boolean => {
     if (s === 0) {
@@ -689,29 +714,29 @@ export const AngebotCard: FC<{
                       <div className={gridRow2}>
                         <div>
                           <label className={labelCls}>Geschlecht <span className="text-red-400">*</span></label>
-                          <CustomSelect value={patient.geschlecht} onChange={v => setPatient(p=>({...p,geschlecht:v}))}
+                          <CustomSelect value={patient.geschlecht} onChange={v => updatePatient(p=>({...p,geschlecht:v}))}
                             options={['Männlich','Weiblich']} />
                         </div>
                         <div>
                           <label className={labelCls}>Geburtsjahr <span className="text-red-400">*</span></label>
-                          <CustomSelect value={patient.geburtsjahr} onChange={v => setPatient(p=>({...p,geburtsjahr:v}))}
+                          <CustomSelect value={patient.geburtsjahr} onChange={v => updatePatient(p=>({...p,geburtsjahr:v}))}
                             options={Array.from({length:70},(_,i)=>String(1931+i))} />
                         </div>
                       </div>
                       <div>
                         <label className={labelCls}>Pflegegrad <span className="text-red-400">*</span></label>
-                        <CustomSelect value={patient.pflegegrad} onChange={v => setPatient(p=>({...p,pflegegrad:v}))}
+                        <CustomSelect value={patient.pflegegrad} onChange={v => updatePatient(p=>({...p,pflegegrad:v}))}
                           options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                       </div>
                       <div className={gridRow2}>
                         <div>
                           <label className={labelCls}>Gewicht <span className="font-normal text-gray-400">(optional)</span></label>
-                          <CustomSelect value={patient.gewicht} onChange={v => setPatient(p=>({...p,gewicht:v}))}
+                          <CustomSelect value={patient.gewicht} onChange={v => updatePatient(p=>({...p,gewicht:v}))}
                             options={['Unter 50 kg','50–70 kg','70–90 kg','90–110 kg','Über 110 kg']} />
                         </div>
                         <div>
                           <label className={labelCls}>Größe <span className="font-normal text-gray-400">(optional)</span></label>
-                          <CustomSelect value={patient.groesse} onChange={v => setPatient(p=>({...p,groesse:v}))}
+                          <CustomSelect value={patient.groesse} onChange={v => updatePatient(p=>({...p,groesse:v}))}
                             options={['Unter 155 cm','155–165 cm','165–175 cm','175–185 cm','Über 185 cm']} />
                         </div>
                       </div>
@@ -726,29 +751,29 @@ export const AngebotCard: FC<{
                         <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Geschlecht <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_geschlecht} onChange={v => setPatient(p=>({...p,p2_geschlecht:v}))}
+                            <CustomSelect value={patient.p2_geschlecht} onChange={v => updatePatient(p=>({...p,p2_geschlecht:v}))}
                               options={['Männlich','Weiblich']} />
                           </div>
                           <div>
                             <label className={labelCls}>Geburtsjahr <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_geburtsjahr} onChange={v => setPatient(p=>({...p,p2_geburtsjahr:v}))}
+                            <CustomSelect value={patient.p2_geburtsjahr} onChange={v => updatePatient(p=>({...p,p2_geburtsjahr:v}))}
                               options={Array.from({length:70},(_,i)=>String(1931+i))} />
                           </div>
                         </div>
                         <div className="mt-2">
                           <label className={labelCls}>Pflegegrad <span className="text-red-400">*</span></label>
-                          <CustomSelect value={patient.p2_pflegegrad} onChange={v => setPatient(p=>({...p,p2_pflegegrad:v}))}
+                          <CustomSelect value={patient.p2_pflegegrad} onChange={v => updatePatient(p=>({...p,p2_pflegegrad:v}))}
                             options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>
                             <label className={labelCls}>Gewicht <span className="font-normal text-gray-400">(optional)</span></label>
-                            <CustomSelect value={patient.p2_gewicht} onChange={v => setPatient(p=>({...p,p2_gewicht:v}))}
+                            <CustomSelect value={patient.p2_gewicht} onChange={v => updatePatient(p=>({...p,p2_gewicht:v}))}
                               options={['Unter 50 kg','50–70 kg','70–90 kg','90–110 kg','Über 110 kg']} />
                           </div>
                           <div>
                             <label className={labelCls}>Größe <span className="font-normal text-gray-400">(optional)</span></label>
-                            <CustomSelect value={patient.p2_groesse} onChange={v => setPatient(p=>({...p,p2_groesse:v}))}
+                            <CustomSelect value={patient.p2_groesse} onChange={v => updatePatient(p=>({...p,p2_groesse:v}))}
                               options={['Unter 155 cm','155–165 cm','165–175 cm','175–185 cm','Über 185 cm']} />
                           </div>
                         </div>
@@ -782,19 +807,19 @@ export const AngebotCard: FC<{
                   <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Heben erforderlich? <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.heben} onChange={v => setPatient(p=>({...p,heben:v}))}
+                      <CustomSelect value={patient.heben} onChange={v => updatePatient(p=>({...p,heben:v}))}
                         options={['Ja','Nein']} />
                     </div>
                     <div>
                       <label className={labelCls}>Demenz <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.demenz} onChange={v => setPatient(p=>({...p,demenz:v}))}
+                      <CustomSelect value={patient.demenz} onChange={v => updatePatient(p=>({...p,demenz:v}))}
                         options={['Nein','Leichtgradig','Mittelgradig','Schwer']} />
                     </div>
                   </div>
                   <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Inkontinenz <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.inkontinenz} onChange={v => setPatient(p=>({...p,inkontinenz:v}))}
+                      <CustomSelect value={patient.inkontinenz} onChange={v => updatePatient(p=>({...p,inkontinenz:v}))}
                         options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                     </div>
                     <div>
@@ -821,30 +846,30 @@ export const AngebotCard: FC<{
                       <div className="space-y-3">
                         <div>
                           <label className={`${labelCls} flex items-center gap-1.5`}>Mobilität <span className="text-red-400">*</span><svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg></label>
-                          <CustomSelect value={patient.p2_mobilitaet} onChange={v => setPatient(p=>({...p,p2_mobilitaet:v}))}
+                          <CustomSelect value={patient.p2_mobilitaet} onChange={v => updatePatient(p=>({...p,p2_mobilitaet:v}))}
                             options={['Vollständig mobil','Am Gehstock','Rollatorfähig','Rollstuhlfähig','Bettlägerig']} />
                         </div>
                         <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Heben erforderlich? <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_heben} onChange={v => setPatient(p=>({...p,p2_heben:v}))}
+                            <CustomSelect value={patient.p2_heben} onChange={v => updatePatient(p=>({...p,p2_heben:v}))}
                               options={['Ja','Nein']} />
                           </div>
                           <div>
                             <label className={labelCls}>Demenz <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_demenz} onChange={v => setPatient(p=>({...p,p2_demenz:v}))}
+                            <CustomSelect value={patient.p2_demenz} onChange={v => updatePatient(p=>({...p,p2_demenz:v}))}
                               options={['Nein','Leichtgradig','Mittelgradig','Schwer']} />
                           </div>
                         </div>
                         <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Inkontinenz <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_inkontinenz} onChange={v => setPatient(p=>({...p,p2_inkontinenz:v}))}
+                            <CustomSelect value={patient.p2_inkontinenz} onChange={v => updatePatient(p=>({...p,p2_inkontinenz:v}))}
                               options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                           </div>
                           <div>
                             <label className={`${labelCls} flex items-center gap-1.5`}>Nachteinsätze <span className="text-red-400">*</span><svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg></label>
-                            <CustomSelect value={patient.p2_nacht} onChange={v => setPatient(p=>({...p,p2_nacht:v}))}
+                            <CustomSelect value={patient.p2_nacht} onChange={v => updatePatient(p=>({...p,p2_nacht:v}))}
                               options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
                           </div>
                         </div>
@@ -891,41 +916,41 @@ export const AngebotCard: FC<{
                   </div>
                   <div>
                     <label className={labelCls}>Familie in der Nähe (bis 20 km) <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.familieNahe} onChange={v => setPatient(p=>({...p,familieNahe:v}))}
+                    <CustomSelect value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
                       options={['Ja','Nein']} />
                   </div>
                   <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Urbanisation <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.urbanisierung} onChange={v => setPatient(p=>({...p,urbanisierung:v}))}
+                      <CustomSelect value={patient.urbanisierung} onChange={v => updatePatient(p=>({...p,urbanisierung:v}))}
                         options={['Großstadt','Kleinstadt','Dorf/Land']} />
                     </div>
                     <div>
                       <label className={labelCls}>Wohnungstyp <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.wohnungstyp} onChange={v => setPatient(p=>({...p,wohnungstyp:v}))}
+                      <CustomSelect value={patient.wohnungstyp} onChange={v => updatePatient(p=>({...p,wohnungstyp:v}))}
                         options={['Einfamilienhaus','Wohnung in Mehrfamilienhaus','Andere']} />
                     </div>
                   </div>
                   <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Unterbringung der PK</label>
-                      <CustomSelect value={patient.unterbringung} onChange={v => setPatient(p=>({...p,unterbringung:v}))}
+                      <CustomSelect value={patient.unterbringung} onChange={v => updatePatient(p=>({...p,unterbringung:v}))}
                         options={['Zimmer in den Räumlichkeiten','Gesamter Bereich','Zimmer extern','Bereich extern']} />
                     </div>
                     <div>
                       <label className={labelCls}>Internet vorhanden? <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.internet} onChange={v => setPatient(p=>({...p,internet:v}))}
+                      <CustomSelect value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
                         options={['Ja','Nein']} />
                     </div>
                   </div>
                   <div>
                     <label className={labelCls}>Haustiere <span className="font-normal text-gray-400">(opt.)</span></label>
-                    <CustomSelect value={patient.tiere} onChange={v => setPatient(p=>({...p,tiere:v}))}
+                    <CustomSelect value={patient.tiere} onChange={v => updatePatient(p=>({...p,tiere:v}))}
                       options={['Keine','Hund','Katze','Andere']} placeholder="Keine" />
                   </div>
                   <div>
                     <label className={labelCls}>Pflegedienst kommt? <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.pflegedienst} onChange={v => setPatient(p=>({...p,pflegedienst:v}))}
+                    <CustomSelect value={patient.pflegedienst} onChange={v => updatePatient(p=>({...p,pflegedienst:v}))}
                       options={['Ja','Nein','Geplant']} />
                   </div>
                 </>
@@ -936,7 +961,7 @@ export const AngebotCard: FC<{
                 <>
                   <div>
                     <label className={labelCls}>Gewünschtes Geschlecht der PK <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.wunschGeschlecht} onChange={v => setPatient(p=>({...p,wunschGeschlecht:v}))}
+                    <CustomSelect value={patient.wunschGeschlecht} onChange={v => updatePatient(p=>({...p,wunschGeschlecht:v}))}
                       options={['Egal','Weiblich','Männlich']} />
                   </div>
 
@@ -976,7 +1001,7 @@ export const AngebotCard: FC<{
 
                   <div>
                     <label className={labelCls}>Darf die Betreuungsperson rauchen? <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.rauchen} onChange={v => setPatient(p=>({...p,rauchen:v}))}
+                    <CustomSelect value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
                       options={['Ja','Nein']} />
                   </div>
                   <div>
