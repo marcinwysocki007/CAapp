@@ -17,15 +17,21 @@ import {
 import { CustomSelect } from './CustomSelect';
 import type { PatientForm } from './shared';
 import { STEP_LABELS } from './shared';
+import type { MamamiaCustomer } from '../../lib/mamamia/types';
+import { mapMamamiaCustomerToPatientForm } from '../../lib/mamamia/mappers';
 
 export const AngebotCard: FC<{
   lead?: Lead | null;
+  /** Snapshot of the customer's Mamamia state — used to seed the
+   *  patient-form wizard with the real backend values, not just the
+   *  stage-A calculator answers. Source-of-truth when available. */
+  mmCustomer?: MamamiaCustomer | null;
   onPatientSaved?: (saved: boolean) => void;
   triggerOpenPatient?: boolean;
   onTriggerHandled?: () => void;
   mamamiaEnabled?: boolean;
   onSaveToMamamia?: (form: PatientForm) => Promise<void>;
-}> = ({ lead, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia }) => {
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia }) => {
   // ─── Derive display values from lead (or fallback to demo data) ──────────────
   // No demo-mode hardcodes (CLAUDE.md §1: real backend or visible failure).
   // When lead is missing, fields render empty — parent decides whether to
@@ -56,7 +62,17 @@ export const AngebotCard: FC<{
   // submission. Only `_isDraft: false` (set when user clicks the final
   // "Daten speichern") flips the customer-portal "Patientendaten" card
   // to its green-checked "Vollständig" state.
+  // Three prefill sources, applied in priority order (highest wins):
+  //   1. localStorage draft (`_isDraft: true`) — user mid-edit, must
+  //      survive refreshes between steps.
+  //   2. Mamamia state — what the backend currently knows (latest save).
+  //   3. formularDaten prefill from the calculator — coarse, stage-A
+  //      stub. Only used for fields neither (1) nor (2) cover.
+  // Final-saved localStorage (`_isDraft: false`) sits at level 1 too —
+  // it's identical to Mamamia state by construction (the save is what
+  // wrote both) so its position relative to (2) doesn't matter.
   const prefill = lead ? prefillPatientFromLead(lead) : {};
+  const mmPrefill = mapMamamiaCustomerToPatientForm(mmCustomer ?? null);
   const savedData: Partial<PatientForm> & { _isDraft?: boolean } = storageKey
     ? (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } })()
     : {};
@@ -64,20 +80,80 @@ export const AngebotCard: FC<{
     ? !!localStorage.getItem(storageKey) && savedData._isDraft !== true
     : false;
 
+  // pick(field) — return the first non-empty value across the three
+  // sources. Empty strings are treated as "missing" so a partial draft
+  // doesn't black-hole a Mamamia value for a field the user hasn't
+  // touched yet.
+  const pick = <K extends keyof PatientForm>(field: K): string => {
+    const fromDraft = savedData[field] as string | undefined;
+    if (fromDraft != null && fromDraft !== '') return fromDraft;
+    const fromMm = (mmPrefill as Record<string, string | undefined>)[field as string];
+    if (fromMm != null && fromMm !== '') return fromMm;
+    const fromCalc = (prefill as Record<string, string | undefined>)[field as string];
+    if (fromCalc != null && fromCalc !== '') return fromCalc;
+    return '';
+  };
+
   const [saved, setSaved] = useState(hasFinalSave);
   const [patient, setPatient] = useState<PatientForm>({
-    anzahl: savedData.anzahl ?? prefill.anzahl ?? '1',
-    geschlecht: savedData.geschlecht ?? '', geburtsjahr: savedData.geburtsjahr ?? '', pflegegrad: savedData.pflegegrad ?? prefill.pflegegrad ?? '', gewicht: savedData.gewicht ?? '', groesse: savedData.groesse ?? '',
-    mobilitaet: savedData.mobilitaet ?? prefill.mobilitaet ?? 'Rollstuhlfähig', heben: savedData.heben ?? '', demenz: savedData.demenz ?? '', inkontinenz: savedData.inkontinenz ?? '', nacht: savedData.nacht ?? prefill.nacht ?? 'Nein',
-    p2_geschlecht: savedData.p2_geschlecht ?? '', p2_geburtsjahr: savedData.p2_geburtsjahr ?? '', p2_pflegegrad: savedData.p2_pflegegrad ?? '', p2_gewicht: savedData.p2_gewicht ?? '', p2_groesse: savedData.p2_groesse ?? '',
-    p2_mobilitaet: savedData.p2_mobilitaet ?? '', p2_heben: savedData.p2_heben ?? '', p2_demenz: savedData.p2_demenz ?? '', p2_inkontinenz: savedData.p2_inkontinenz ?? '', p2_nacht: savedData.p2_nacht ?? '',
-    diagnosen: savedData.diagnosen ?? '',
-    plz: savedData.plz ?? '', ort: savedData.ort ?? '', haushalt: savedData.haushalt ?? 'Ehepartner/in', wohnungstyp: savedData.wohnungstyp ?? '', urbanisierung: savedData.urbanisierung ?? '', familieNahe: savedData.familieNahe ?? '', pflegedienst: savedData.pflegedienst ?? '', internet: savedData.internet ?? '',
-    tiere: savedData.tiere ?? '', unterbringung: savedData.unterbringung ?? '', aufgaben: savedData.aufgaben ?? '',
-    wunschGeschlecht: savedData.wunschGeschlecht ?? prefill.wunschGeschlecht ?? '', rauchen: savedData.rauchen ?? '', sonstigeWuensche: savedData.sonstigeWuensche ?? '',
+    anzahl: (pick('anzahl') as '1' | '2' | '') || '1',
+    geschlecht: pick('geschlecht'), geburtsjahr: pick('geburtsjahr'),
+    pflegegrad: pick('pflegegrad'), gewicht: pick('gewicht'), groesse: pick('groesse'),
+    mobilitaet: pick('mobilitaet') || 'Rollstuhlfähig',
+    heben: pick('heben'), demenz: pick('demenz'), inkontinenz: pick('inkontinenz'),
+    nacht: pick('nacht') || 'Nein',
+    p2_geschlecht: pick('p2_geschlecht'), p2_geburtsjahr: pick('p2_geburtsjahr'),
+    p2_pflegegrad: pick('p2_pflegegrad'), p2_gewicht: pick('p2_gewicht'), p2_groesse: pick('p2_groesse'),
+    p2_mobilitaet: pick('p2_mobilitaet'), p2_heben: pick('p2_heben'),
+    p2_demenz: pick('p2_demenz'), p2_inkontinenz: pick('p2_inkontinenz'), p2_nacht: pick('p2_nacht'),
+    diagnosen: pick('diagnosen'),
+    plz: pick('plz'), ort: pick('ort'),
+    haushalt: pick('haushalt') || 'Ehepartner/in',
+    wohnungstyp: pick('wohnungstyp'), urbanisierung: pick('urbanisierung'),
+    familieNahe: pick('familieNahe'), pflegedienst: pick('pflegedienst'), internet: pick('internet'),
+    tiere: pick('tiere'), unterbringung: pick('unterbringung'), aufgaben: pick('aufgaben'),
+    wunschGeschlecht: pick('wunschGeschlecht'),
+    rauchen: pick('rauchen'), sonstigeWuensche: pick('sonstigeWuensche'),
   });
 
   const zwei = patient.anzahl === '2';
+
+  // Re-hydrate patient state when mmCustomer arrives async (after the
+  // initial render with mmCustomer=null). We skip this when:
+  //   - localStorage has a true draft (`_isDraft: true`) — user is in
+  //     the middle of editing, must not stomp.
+  //   - we've already merged once for this customer (fingerprint guard).
+  // Per-field merge: only fill blanks (so any edits the user made
+  // BEFORE mmCustomer arrived survive).
+  const mmMergedFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!mmCustomer) return;
+    if (mmMergedFor.current === mmCustomer.id) return;
+    if (savedData._isDraft === true) {
+      mmMergedFor.current = mmCustomer.id;
+      return;
+    }
+    const fresh = mapMamamiaCustomerToPatientForm(mmCustomer);
+    mmMergedFor.current = mmCustomer.id;
+    setPatient(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const [k, v] of Object.entries(fresh)) {
+        if (v == null || v === '') continue;
+        const cur = (prev as unknown as Record<string, string | undefined>)[k];
+        const isDefault = (cur === '' || cur == null)
+          || (k === 'mobilitaet' && cur === 'Rollstuhlfähig')
+          || (k === 'nacht' && cur === 'Nein')
+          || (k === 'haushalt' && cur === 'Ehepartner/in');
+        if (isDefault) {
+          (next as unknown as Record<string, string>)[k] = v as string;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mmCustomer?.id]);
 
   // Autosave draft on every patient field change so a user who navigates
   // away mid-form (close tab / refresh / back-to-step-1) sees their

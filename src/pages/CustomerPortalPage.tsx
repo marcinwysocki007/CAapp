@@ -432,6 +432,7 @@ const CustomerPortalPage: FC = () => {
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ── */}
         <AngebotCard
           lead={lead}
+          mmCustomer={mmCustomer}
           onPatientSaved={setPatientSaved}
           triggerOpenPatient={triggerOpenPatient}
           onTriggerHandled={() => setTriggerOpenPatient(false)}

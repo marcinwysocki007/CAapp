@@ -18,6 +18,11 @@ export const GET_JOB_OFFER = /* GraphQL */ `
   }
 `;
 
+// GET_CUSTOMER pulls every field the in-portal patient-form wizard
+// needs to seed itself. Without these we'd silently fall back to the
+// calculator's stage-A formularDaten prefill — which can drift from the
+// real Mamamia state if anyone edited the customer (panel admin, an
+// earlier UpdateCustomer save, etc.).
 export const GET_CUSTOMER = /* GraphQL */ `
   query GetCustomer($id: Int!) {
     Customer(id: $id) {
@@ -38,11 +43,17 @@ export const GET_CUSTOMER = /* GraphQL */ `
       gender
       year_of_birth
       accommodation
+      caregiver_accommodated
       other_people_in_house
       has_family_near_by
       smoking_household
       internet
       urbanization_id
+      pets
+      is_pet_dog
+      is_pet_cat
+      is_pet_other
+      day_care_facility
       patients {
         id
         gender
@@ -53,11 +64,36 @@ export const GET_CUSTOMER = /* GraphQL */ `
         height
         night_operations
         dementia
+        dementia_description
         incontinence
         incontinence_feces
         incontinence_urine
         smoking
         lift_id
+      }
+      customer_caregiver_wish {
+        id
+        gender
+        germany_skill
+        driving_license
+        driving_license_gearbox
+        smoking
+        shopping
+        tasks
+        other_wishes
+      }
+      customer_contracts {
+        id
+        contact_type
+        salutation
+        first_name
+        last_name
+        phone
+        email
+        location_id
+        zip_code
+        city
+        street_number
       }
     }
   }

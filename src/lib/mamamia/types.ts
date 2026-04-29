@@ -18,6 +18,54 @@ export interface MamamiaJobOffer {
   created_at: string;
 }
 
+// Existing patient row pulled from GetCustomer. Used both to thread
+// patient.id into UpdateCustomer (so Mamamia doesn't silently drop
+// fields) AND to seed the patient-form wizard with the real Mamamia
+// state instead of the stale calculator prefill.
+export interface MamamiaPatient {
+  id: number;
+  gender?: 'male' | 'female' | 'not_important' | null;
+  year_of_birth?: number | null;
+  care_level?: number | null;
+  mobility_id?: number | null;
+  weight?: string | null;
+  height?: string | null;
+  night_operations?: string | null;
+  dementia?: 'yes' | 'no' | null;
+  dementia_description?: string | null;
+  incontinence?: boolean | null;
+  incontinence_feces?: boolean | null;
+  incontinence_urine?: boolean | null;
+  smoking?: boolean | null;
+  lift_id?: number | null;
+}
+
+export interface MamamiaCaregiverWish {
+  id?: number | null;
+  gender?: string | null;
+  germany_skill?: string | null;
+  driving_license?: string | null;
+  driving_license_gearbox?: string | null;
+  smoking?: string | null;
+  shopping?: string | null;
+  tasks?: string | null;
+  other_wishes?: string | null;
+}
+
+export interface MamamiaCustomerContract {
+  id?: number;
+  contact_type?: string | null;
+  salutation?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  location_id?: number | null;
+  zip_code?: string | null;
+  city?: string | null;
+  street_number?: string | null;
+}
+
 export interface MamamiaCustomer {
   id: number;
   customer_id: string;
@@ -25,14 +73,33 @@ export interface MamamiaCustomer {
   first_name: string | null;
   last_name: string | null;
   email: string | null;
+  phone?: string | null;
+  language_id?: number | null;
   location_id: number | null;
   location_custom_text: string | null;
   job_description: string | null;
   arrival_at: string | null;
   departure_at: string | null;
   care_budget: number | null;
-  /** Existing patients — used to thread patient.id when UpdateCustomer mutates them. */
-  patients?: Array<{ id: number }>;
+  // ── Patient-form-relevant customer-level fields (added 2026-04-29) ──
+  gender?: string | null;
+  year_of_birth?: number | null;
+  accommodation?: string | null;
+  caregiver_accommodated?: string | null;
+  other_people_in_house?: string | null;
+  has_family_near_by?: string | null;
+  smoking_household?: string | null;
+  internet?: string | null;
+  urbanization_id?: number | null;
+  pets?: string | null;
+  is_pet_dog?: boolean | null;
+  is_pet_cat?: boolean | null;
+  is_pet_other?: boolean | null;
+  day_care_facility?: string | null;
+  /** Patients — full shape for prefill, not just { id }. */
+  patients?: MamamiaPatient[];
+  customer_caregiver_wish?: MamamiaCaregiverWish | null;
+  customer_contracts?: MamamiaCustomerContract[];
 }
 
 export interface MamamiaCaregiverRef {
