@@ -89,6 +89,9 @@ const CustomerPortalPage: FC = () => {
   const { data: mmCustomer } = useCustomer(mmReady);
   const { data: mmJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
+  // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
+  // re-orders the page-1 batch by our own criteria (availability, freshness,
+  // experience) rather than relying on Mamamia's server-side `order_by`.
   const { data: mmMatchings } = useMatchings({ limit: 20 }, mmReady);
   // Set of caregiver IDs already invited (Request rows in Mamamia). Used
   // below to seed nurseStatuses with 'invited' so the badge survives F5.
@@ -126,12 +129,51 @@ const CustomerPortalPage: FC = () => {
   // Caregiver id mapping per match index (for invite flow).
   // effectiveMatched[idx].caregiverId resolves to real Mamamia id. Empty
   // array until session ready — NO mock/demo fallback (CLAUDE.md §1).
+  //
+  // Client-side ranking — Mamamia returns up to 20 already wish-filtered
+  // candidates (gender, skill floor, driving license — verified live
+  // 2026-04-29: 0 wish violations across 6 customers / 241 matches).
+  // What we add on top: order by signals we care about per business rule.
+  //   primary  : available_from ASC  (next available first; null/past = top)
+  //   secondary: last_contact_at DESC (recently-active CGs respond faster)
+  //   tertiary : hp_total_jobs   DESC (more experience first)
   const effectiveMatched = (() => {
     if (!mmReady || !mmMatchings?.data) return [];
     const nowIso = new Date().toISOString();
     const nowYear = new Date().getFullYear();
+    const nowMs = new Date(nowIso).getTime();
+
+    // Numeric sort keys built from raw Mamamia fields. NaN guard: missing
+    // values rank "best" — null available_from = "Sofort" should be top,
+    // missing last_contact = treat as long ago (rank lower).
+    const availMs = (iso: string | null): number => {
+      if (!iso) return 0; // "Sofort" → top
+      const t = new Date(iso).getTime();
+      // CGs already past their availability date are equally "available now".
+      return Number.isFinite(t) ? Math.max(0, t - nowMs) : Infinity;
+    };
+    const contactMs = (iso: string | null): number => {
+      if (!iso) return -Infinity;
+      const t = new Date(iso).getTime();
+      return Number.isFinite(t) ? t : -Infinity;
+    };
+
     return mmMatchings.data
       .filter(m => m.is_show !== false)
+      .slice() // don't mutate the SWR cache array
+      .sort((a, b) => {
+        const av = availMs(a.caregiver.available_from);
+        const bv = availMs(b.caregiver.available_from);
+        if (av !== bv) return av - bv;
+
+        const ac = contactMs(a.caregiver.last_contact_at);
+        const bc = contactMs(b.caregiver.last_contact_at);
+        if (ac !== bc) return bc - ac;
+
+        const aj = a.caregiver.hp_total_jobs ?? 0;
+        const bj = b.caregiver.hp_total_jobs ?? 0;
+        return bj - aj;
+      })
       .map(m => ({
         nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
         caregiverId: m.caregiver.id,
