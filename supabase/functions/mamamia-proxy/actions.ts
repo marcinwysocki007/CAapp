@@ -298,6 +298,7 @@ const UPDATE_CUSTOMER_ALLOWED = new Set([
   "is_pet_dog",
   "is_pet_cat",
   "is_pet_other",
+  "equipment_ids",
   "patients",
   "customer_caregiver_wish",
 ]);
@@ -325,7 +326,32 @@ function pickAllowedWish(input: unknown): Record<string, unknown> | null {
   return Object.keys(out).length > 0 ? out : null;
 }
 
-const updateCustomer: ActionHandler = (session, variables, deps) => {
+// Mamamia gotcha: UpdateCustomer treats omitted association inputs as
+// "wipe to empty". We learned this the hard way after the in-portal
+// patient form save (proxy.updateCustomer) silently zeroed out:
+//   • Customer.equipments  (TV / bathroom / kitchen / others)
+//   • Patient.tools        (rollator / walking stick / hoist)
+// — both populated by the onboard mapper, both wiped on first
+// UpdateCustomer call because the client doesn't carry them in its
+// patch. Fix: re-fetch current values and re-pass them whenever the
+// caller didn't explicitly provide their own.
+const PRESERVE_QUERY = /* GraphQL */ `
+  query PreserveAssociations($id: Int!) {
+    Customer(id: $id) {
+      equipments { id }
+      patients { id tools { id } }
+    }
+  }
+`;
+
+interface PreserveData {
+  Customer: {
+    equipments: Array<{ id: number }>;
+    patients: Array<{ id: number; tools: Array<{ id: number }> }>;
+  };
+}
+
+const updateCustomer: ActionHandler = async (session, variables, deps) => {
   const patch: Record<string, unknown> = { id: session.customer_id };
   for (const [k, v] of Object.entries(variables)) {
     if (k === "customer_caregiver_wish") {
@@ -335,6 +361,49 @@ const updateCustomer: ActionHandler = (session, variables, deps) => {
       patch[k] = v;
     }
   }
+
+  // ── Preserve associations the caller didn't touch ──
+  // Always re-fetch current Customer.equipments and per-patient tools
+  // and pass them back unless the caller explicitly supplied their own.
+  const needsEquipmentPreserve = !("equipment_ids" in patch);
+  const patientPatches = Array.isArray(patch.patients) ? patch.patients : null;
+  const needsToolPreserve = !!patientPatches && patientPatches.some((p) =>
+    p && typeof p === "object" && !("tool_ids" in (p as Record<string, unknown>))
+  );
+
+  if (needsEquipmentPreserve || needsToolPreserve) {
+    try {
+      const current = await runGraphQL<PreserveData>(deps, PRESERVE_QUERY, {
+        id: session.customer_id,
+      });
+
+      if (needsEquipmentPreserve) {
+        patch.equipment_ids = current.Customer.equipments.map((e) => e.id);
+      }
+
+      if (needsToolPreserve && patientPatches) {
+        const toolsByPatientId = new Map<number, number[]>();
+        for (const p of current.Customer.patients) {
+          toolsByPatientId.set(p.id, p.tools.map((t) => t.id));
+        }
+        patch.patients = patientPatches.map((p) => {
+          if (!p || typeof p !== "object") return p;
+          const pp = p as Record<string, unknown>;
+          if ("tool_ids" in pp) return pp;
+          const id = typeof pp.id === "number" ? pp.id : null;
+          if (id == null) return pp;
+          const existing = toolsByPatientId.get(id);
+          if (!existing) return pp;
+          return { ...pp, tool_ids: existing };
+        });
+      }
+    } catch (e) {
+      // Preserve fetch failed — log but proceed; better to apply the
+      // user's update than to block the save on a defensive read.
+      console.warn("updateCustomer preserve fetch failed:", (e as Error).message);
+    }
+  }
+
   return runGraphQL(deps, UPDATE_CUSTOMER, patch);
 };
 

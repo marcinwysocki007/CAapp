@@ -95,6 +95,10 @@ export const GET_CUSTOMER = /* GraphQL */ `
         city
         street_number
       }
+      equipments {
+        id
+        equipment
+      }
     }
   }
 `;
@@ -381,6 +385,7 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
     $is_pet_dog: Boolean
     $is_pet_cat: Boolean
     $is_pet_other: Boolean
+    $equipment_ids: [Int]
     $patients: [PatientInputType]
     $customer_caregiver_wish: CustomerCaregiverWishInputType
   ) {
@@ -406,6 +411,7 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
       is_pet_dog: $is_pet_dog
       is_pet_cat: $is_pet_cat
       is_pet_other: $is_pet_other
+      equipment_ids: $equipment_ids
       patients: $patients
       customer_caregiver_wish: $customer_caregiver_wish
     ) {

@@ -1,0 +1,734 @@
+// 10-customer END-TO-END test via product flow:
+//   Supabase (insert lead) →
+//   POST /functions/v1/onboard-to-mamamia (token → Mamamia Customer + cookie) →
+//   POST /functions/v1/mamamia-proxy {action:updateCustomer} (patient form save) →
+//   POST /functions/v1/mamamia-proxy {action:getCustomer} (verify Mamamia state)
+//
+// No MAMAMIA_ENDPOINT/PRIMUNDUS_USER_TOKEN needed locally — all the
+// privileged Mamamia agency credentials live in deployed Edge Function
+// secrets. We use only:
+//   - SUPABASE_URL + ANON_KEY  (lead insert; RLS lets anon write)
+//   - Deployed onboard endpoint (handles LoginAgency + StoreCustomer)
+//   - Deployed mamamia-proxy   (uses session cookie returned by onboard)
+//
+// Usage:  deno run --allow-net --allow-env --allow-read \
+//   --allow-import=/Users/michalkepinski/Documents/Projects/CAapp \
+//   /tmp/matrix-10-via-product-flow.mjs
+
+import { mapPatientFormToUpdateCustomerInput } from "/Users/michalkepinski/Documents/Projects/CAapp/src/lib/mamamia/patientFormMapper.ts";
+
+const SUPABASE_URL  = "https://ycdwtrklpoqprabtwahi.supabase.co";
+const ANON_KEY      = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZHd0cmtscG9xcHJhYnR3YWhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MjQwMTksImV4cCI6MjA4NzAwMDAxOX0.TN0T4yNwaZdF0BRpntVLQYvy6dr7KFqBjteNm8eKBvE";
+const ONBOARD_URL   = `${SUPABASE_URL}/functions/v1/onboard-to-mamamia`;
+const PROXY_URL     = `${SUPABASE_URL}/functions/v1/mamamia-proxy`;
+
+// ─── REST helpers ──────────────────────────────────────────────────────────
+
+async function supabaseInsert(table, row) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: "POST",
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${ANON_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(row),
+  });
+  if (!r.ok) throw new Error(`insert ${table}: ${r.status} ${await r.text()}`);
+  return (await r.json())[0];
+}
+
+async function supabaseSelect(table, query) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
+  });
+  if (!r.ok) throw new Error(`select ${table}: ${r.status} ${await r.text()}`);
+  return await r.json();
+}
+
+async function callOnboard(token) {
+  const r = await fetch(ONBOARD_URL, {
+    method: "POST",
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${ANON_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ token }),
+  });
+  const setCookie = r.headers.get("set-cookie");
+  const text = await r.text();
+  if (!r.ok) throw new Error(`onboard: ${r.status} ${text}`);
+  let body;
+  try { body = JSON.parse(text); } catch { body = text; }
+  return { body, setCookie };
+}
+
+// Strip everything after the first "; " from Set-Cookie header so we
+// keep only `name=value` for re-sending.
+function extractSessionCookie(setCookieHeader) {
+  if (!setCookieHeader) return null;
+  const m = setCookieHeader.match(/session=[^;]+/);
+  return m ? m[0] : null;
+}
+
+async function callProxy(action, variables, sessionCookie) {
+  const r = await fetch(PROXY_URL, {
+    method: "POST",
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${ANON_KEY}`,
+      "Content-Type": "application/json",
+      Cookie: sessionCookie,
+    },
+    body: JSON.stringify({ action, variables }),
+  });
+  const text = await r.text();
+  if (!r.ok) throw new Error(`proxy[${action}]: ${r.status} ${text}`);
+  return JSON.parse(text).data;
+}
+
+// ─── Lead-builder helpers ──────────────────────────────────────────────────
+
+function generateToken() {
+  const arr = new Uint8Array(24);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function tokenExpiry() {
+  return new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function buildLeadRow(fix, suffix) {
+  const ts = Date.now();
+  return {
+    email: `primundus-matrix-${ts}-${suffix}@mailinator.com`,
+    vorname: fix.leadIdentity.vorname,
+    nachname: fix.leadIdentity.nachname,
+    anrede: fix.leadIdentity.anrede,
+    anrede_text: fix.leadIdentity.anrede,
+    telefon: "+49 30 11111111",
+    status: "vertrag_abgeschlossen",
+    token: generateToken(),
+    token_expires_at: tokenExpiry(),
+    token_used: false,
+    care_start_timing: "sofort",
+    kalkulation: {
+      bruttopreis: 3500,
+      eigenanteil: 1800,
+      formularDaten: fix.fd,
+    },
+    patient_anrede: fix.stageB.anrede,
+    patient_vorname: fix.stageB.vorname,
+    patient_nachname: fix.stageB.nachname,
+    patient_street: fix.stageB.street,
+    patient_zip: fix.stageB.plz,
+    patient_city: fix.stageB.city,
+    source: "matrix-10-test",
+    order_confirmed_at: new Date().toISOString(),
+  };
+}
+
+// ─── 10 fixtures ───────────────────────────────────────────────────────────
+
+const fixtures = [
+  {
+    name: "F1: Pg1 mobil single Berlin, no dementia, dog",
+    fd: { pflegegrad: 1, mobilitaet: "mobil", nachteinsaetze: "nein",
+          betreuung_fuer: "1-person", weitere_personen: "nein", geschlecht: "egal",
+          deutschkenntnisse: "kommunikativ", fuehrerschein: "egal", erfahrung: "einsteiger" },
+    stageB: { plz: "10115", city: "Berlin", street: "Friedrichstraße 12",
+              anrede: "Frau", vorname: "Anna", nachname: "Schmidt" },
+    leadIdentity: { anrede: "Frau", vorname: "Anna", nachname: "Schmidt" },
+    form: {
+      anzahl: "1",
+      geschlecht: "Weiblich", geburtsjahr: "1955", pflegegrad: "Pflegegrad 1",
+      gewicht: "61-70 kg", groesse: "161-170 cm", mobilitaet: "Selbstständig mobil",
+      heben: "Nein", demenz: "Nein", inkontinenz: "Nein", nacht: "Nein",
+      p2_geschlecht: "", p2_geburtsjahr: "", p2_pflegegrad: "", p2_gewicht: "",
+      p2_groesse: "", p2_mobilitaet: "", p2_heben: "", p2_demenz: "",
+      p2_inkontinenz: "", p2_nacht: "",
+      diagnosen: "Bluthochdruck", plz: "10115", ort: "Berlin",
+      haushalt: "Allein", wohnungstyp: "Einfamilienhaus", urbanisierung: "Großstadt",
+      familieNahe: "Ja", pflegedienst: "Nein", internet: "Ja",
+      tiere: "Hund", unterbringung: "Zimmer in den Räumlichkeiten",
+      aufgaben: "Spaziergänge, Gesellschaft", wunschGeschlecht: "Egal",
+      rauchen: "Nein", sonstigeWuensche: "Sehr selbstständig",
+    },
+    expect: {
+      patient_count: 1,
+      p0: { gender: "female", year_of_birth: 1955, care_level: 1,
+            mobility_id: 1, lift_id: 2, dementia: "no",
+            incontinence: false, night_operations: "no" },
+      cust: { accommodation: "single_family_house", urbanization_id: 3,
+              has_family_near_by: "yes", internet: "yes", day_care_facility: "no",
+              pets: "yes", is_pet_dog: true, is_pet_cat: false, is_pet_other: false,
+              caregiver_accommodated: "room_premises", other_people_in_house: "no" },
+      wish: { gender: "not_important", smoking: "no" },
+      job_description_contains: "Bluthochdruck",
+      wish_tasks_contains: "Spaziergänge",
+    },
+  },
+  {
+    name: "F2: Pg5 bettlaegerig couple München, severe dementia, both inc",
+    fd: { pflegegrad: 5, mobilitaet: "bettlaegerig", nachteinsaetze: "mehrmals",
+          betreuung_fuer: "ehepaar", weitere_personen: "nein", geschlecht: "weiblich",
+          deutschkenntnisse: "sehr-gut", fuehrerschein: "ja", erfahrung: "sehr-erfahren",
+          demenz: "ja" },
+    stageB: { plz: "80331", city: "München", street: "Marienplatz 1",
+              anrede: "Herr", vorname: "Klaus", nachname: "Brenner" },
+    leadIdentity: { anrede: "Frau", vorname: "Helga", nachname: "Brenner" },
+    form: {
+      anzahl: "2",
+      geschlecht: "Männlich", geburtsjahr: "1938", pflegegrad: "Pflegegrad 5",
+      gewicht: "81-90 kg", groesse: "171-180 cm", mobilitaet: "Bettlägerig",
+      heben: "Ja", demenz: "Schwer", inkontinenz: "Beides", nacht: "Mehr als 2",
+      p2_geschlecht: "Weiblich", p2_geburtsjahr: "1942", p2_pflegegrad: "Pflegegrad 4",
+      p2_gewicht: "61-70 kg", p2_groesse: "151-160 cm", p2_mobilitaet: "Rollstuhlfähig",
+      p2_heben: "Ja", p2_demenz: "Mittelgradig", p2_inkontinenz: "Harninkontinenz",
+      p2_nacht: "1–2 Mal",
+      diagnosen: "Schlaganfall, Diabetes, Alzheimer", plz: "80331", ort: "München",
+      haushalt: "Ehepartner/in", wohnungstyp: "Wohnung in Mehrfamilienhaus",
+      urbanisierung: "Großstadt", familieNahe: "Nein", pflegedienst: "Ja",
+      internet: "Ja", tiere: "Keine", unterbringung: "Gesamter Bereich",
+      aufgaben: "Vollpflege, Lagerung, Medikation", wunschGeschlecht: "Weiblich",
+      rauchen: "Nein", sonstigeWuensche: "Nachterfahrung notwendig",
+    },
+    expect: {
+      patient_count: 2,
+      p0: { gender: "male", year_of_birth: 1938, care_level: 5,
+            mobility_id: 5, lift_id: 1, dementia: "yes",
+            incontinence: true, incontinence_feces: true, incontinence_urine: true,
+            night_operations: "more_than_2" },
+      p1: { gender: "female", year_of_birth: 1942, care_level: 4,
+            mobility_id: 4, lift_id: 1, dementia: "yes",
+            incontinence: true, incontinence_urine: true, incontinence_feces: false,
+            night_operations: "1_2_times" },
+      cust: { accommodation: "apartment", urbanization_id: 3,
+              has_family_near_by: "no", internet: "yes", day_care_facility: "yes",
+              pets: "no", caregiver_accommodated: "area_premises",
+              other_people_in_house: "yes" },
+      wish: { gender: "female", smoking: "no" },
+      dementia_desc_contains: "schwer",
+      job_description_contains: "Alzheimer",
+    },
+  },
+  {
+    name: "F3: Pg3 rollstuhl single female Hamburg, mild dementia, urine inc",
+    fd: { pflegegrad: 3, mobilitaet: "rollstuhl", nachteinsaetze: "taeglich",
+          betreuung_fuer: "1-person", weitere_personen: "ja", geschlecht: "weiblich",
+          deutschkenntnisse: "kommunikativ", fuehrerschein: "ja", erfahrung: "erfahren",
+          demenz: "ja" },
+    stageB: { plz: "20095", city: "Hamburg", street: "Mönckebergstraße 7",
+              anrede: "Frau", vorname: "Ursula", nachname: "Becker" },
+    leadIdentity: { anrede: "Frau", vorname: "Ursula", nachname: "Becker" },
+    form: {
+      anzahl: "1",
+      geschlecht: "Weiblich", geburtsjahr: "1948", pflegegrad: "Pflegegrad 3",
+      gewicht: "61-70 kg", groesse: "151-160 cm", mobilitaet: "Rollstuhlfähig",
+      heben: "Ja", demenz: "Leichtgradig", inkontinenz: "Harninkontinenz",
+      nacht: "Bis zu 1 Mal",
+      p2_geschlecht: "", p2_geburtsjahr: "", p2_pflegegrad: "", p2_gewicht: "",
+      p2_groesse: "", p2_mobilitaet: "", p2_heben: "", p2_demenz: "",
+      p2_inkontinenz: "", p2_nacht: "",
+      diagnosen: "Multiple Sklerose, Demenz beginnend", plz: "20095", ort: "Hamburg",
+      haushalt: "Sohn", wohnungstyp: "Wohnung in Mehrfamilienhaus",
+      urbanisierung: "Großstadt", familieNahe: "Ja", pflegedienst: "Geplant",
+      internet: "Ja", tiere: "Katze", unterbringung: "Zimmer in den Räumlichkeiten",
+      aufgaben: "Mobilisierung, Hauswirtschaft", wunschGeschlecht: "Weiblich",
+      rauchen: "Nein", sonstigeWuensche: "Mit MS-Erfahrung",
+    },
+    expect: {
+      patient_count: 1,
+      p0: { gender: "female", year_of_birth: 1948, care_level: 3,
+            mobility_id: 4, lift_id: 1, dementia: "yes",
+            incontinence: true, incontinence_urine: true, incontinence_feces: false,
+            night_operations: "up_to_1_time" },
+      cust: { accommodation: "apartment", urbanization_id: 3,
+              has_family_near_by: "yes", internet: "yes", day_care_facility: "yes",
+              pets: "yes", is_pet_dog: false, is_pet_cat: true, is_pet_other: false,
+              caregiver_accommodated: "room_premises",
+              other_people_in_house: "no" },
+      wish: { gender: "female", smoking: "no" },
+      dementia_desc_contains: "leicht",
+    },
+  },
+  {
+    name: "F4: Pg2 rollator couple Köln, no dementia, smoking allowed",
+    fd: { pflegegrad: 2, mobilitaet: "rollator", nachteinsaetze: "gelegentlich",
+          betreuung_fuer: "ehepaar", weitere_personen: "nein", geschlecht: "maennlich",
+          deutschkenntnisse: "kommunikativ", fuehrerschein: "nein", erfahrung: "erfahren" },
+    stageB: { plz: "50667", city: "Köln", street: "Hohe Straße 100",
+              anrede: "Herr", vorname: "Peter", nachname: "Wagner" },
+    leadIdentity: { anrede: "Frau", vorname: "Maria", nachname: "Wagner" },
+    form: {
+      anzahl: "2",
+      geschlecht: "Männlich", geburtsjahr: "1945", pflegegrad: "Pflegegrad 2",
+      gewicht: "71-80 kg", groesse: "171-180 cm", mobilitaet: "Rollatorfähig",
+      heben: "Nein", demenz: "Nein", inkontinenz: "Nein", nacht: "Bis zu 1 Mal",
+      p2_geschlecht: "Weiblich", p2_geburtsjahr: "1948", p2_pflegegrad: "Pflegegrad 2",
+      p2_gewicht: "61-70 kg", p2_groesse: "161-170 cm", p2_mobilitaet: "Selbstständig mobil",
+      p2_heben: "Nein", p2_demenz: "Nein", p2_inkontinenz: "Nein", p2_nacht: "Nein",
+      diagnosen: "Arthrose, Diabetes Typ 2", plz: "50667", ort: "Köln",
+      haushalt: "Ehepartner/in", wohnungstyp: "Einfamilienhaus",
+      urbanisierung: "Kleinstadt", familieNahe: "Ja", pflegedienst: "Nein",
+      internet: "Ja", tiere: "Hund", unterbringung: "Bereich extern",
+      aufgaben: "Begleitung, Hauswirtschaft", wunschGeschlecht: "Männlich",
+      rauchen: "Ja", sonstigeWuensche: "Beide rauchen, Hund ist sehr lieb",
+    },
+    expect: {
+      patient_count: 2,
+      p0: { gender: "male", year_of_birth: 1945, care_level: 2,
+            mobility_id: 3, lift_id: 2, dementia: "no",
+            incontinence: false, night_operations: "up_to_1_time" },
+      p1: { gender: "female", year_of_birth: 1948, care_level: 2,
+            mobility_id: 1, lift_id: 2, dementia: "no",
+            incontinence: false, night_operations: "no" },
+      cust: { accommodation: "single_family_house", urbanization_id: 2,
+              has_family_near_by: "yes", internet: "yes", day_care_facility: "no",
+              pets: "yes", is_pet_dog: true, caregiver_accommodated: "area_other_premises",
+              other_people_in_house: "yes" },
+      wish: { gender: "male", smoking: "yes_outside" },
+    },
+  },
+  {
+    name: "F5: Pg4 gehstock single male Frankfurt, moderate dementia",
+    fd: { pflegegrad: 4, mobilitaet: "gehstock", nachteinsaetze: "nein",
+          betreuung_fuer: "1-person", weitere_personen: "nein", geschlecht: "egal",
+          deutschkenntnisse: "kommunikativ", fuehrerschein: "egal", erfahrung: "erfahren" },
+    stageB: { plz: "60311", city: "Frankfurt", street: "Zeil 50",
+              anrede: "Herr", vorname: "Werner", nachname: "Hofmann" },
+    leadIdentity: { anrede: "Herr", vorname: "Werner", nachname: "Hofmann" },
+    form: {
+      anzahl: "1",
+      geschlecht: "Männlich", geburtsjahr: "1942", pflegegrad: "Pflegegrad 4",
+      gewicht: "81-90 kg", groesse: "171-180 cm", mobilitaet: "Am Gehstock",
+      heben: "Nein", demenz: "Mittelgradig", inkontinenz: "Stuhlinkontinenz",
+      nacht: "1–2 Mal",
+      p2_geschlecht: "", p2_geburtsjahr: "", p2_pflegegrad: "", p2_gewicht: "",
+      p2_groesse: "", p2_mobilitaet: "", p2_heben: "", p2_demenz: "",
+      p2_inkontinenz: "", p2_nacht: "",
+      diagnosen: "Parkinson, Demenz mittel", plz: "60311", ort: "Frankfurt",
+      haushalt: "Allein", wohnungstyp: "Wohnung in Mehrfamilienhaus",
+      urbanisierung: "Großstadt", familieNahe: "Nein", pflegedienst: "Ja",
+      internet: "Nein", tiere: "Keine", unterbringung: "Zimmer extern",
+      aufgaben: "Grundpflege, Medikation, Begleitung", wunschGeschlecht: "Egal",
+      rauchen: "Nein", sonstigeWuensche: "Geduldig mit Demenzpatient",
+    },
+    expect: {
+      patient_count: 1,
+      p0: { gender: "male", year_of_birth: 1942, care_level: 4,
+            mobility_id: 2, lift_id: 2, dementia: "yes",
+            incontinence: true, incontinence_feces: true, incontinence_urine: false,
+            night_operations: "1_2_times" },
+      cust: { accommodation: "apartment", urbanization_id: 3,
+              has_family_near_by: "no", internet: "no", day_care_facility: "yes",
+              pets: "no", caregiver_accommodated: "room_other_premises",
+              other_people_in_house: "no" },
+      wish: { gender: "not_important", smoking: "no" },
+      dementia_desc_contains: "mittel",
+    },
+  },
+  {
+    name: "F6: Pg2 rollator single female Stuttgart Dorf/Land, andere pets",
+    fd: { pflegegrad: 2, mobilitaet: "rollator", nachteinsaetze: "nein",
+          betreuung_fuer: "1-person", weitere_personen: "nein", geschlecht: "weiblich",
+          deutschkenntnisse: "grundlegend", fuehrerschein: "ja", erfahrung: "einsteiger" },
+    stageB: { plz: "70173", city: "Stuttgart", street: "Königstraße 22",
+              anrede: "Frau", vorname: "Erika", nachname: "Wolf" },
+    leadIdentity: { anrede: "Frau", vorname: "Erika", nachname: "Wolf" },
+    form: {
+      anzahl: "1",
+      geschlecht: "Weiblich", geburtsjahr: "1940", pflegegrad: "Pflegegrad 2",
+      gewicht: "51-60 kg", groesse: "151-160 cm", mobilitaet: "Rollatorfähig",
+      heben: "Nein", demenz: "Nein", inkontinenz: "Nein", nacht: "Nein",
+      p2_geschlecht: "", p2_geburtsjahr: "", p2_pflegegrad: "", p2_gewicht: "",
+      p2_groesse: "", p2_mobilitaet: "", p2_heben: "", p2_demenz: "",
+      p2_inkontinenz: "", p2_nacht: "",
+      diagnosen: "Osteoporose", plz: "70173", ort: "Stuttgart",
+      haushalt: "Allein", wohnungstyp: "Einfamilienhaus",
+      urbanisierung: "Dorf/Land", familieNahe: "Ja", pflegedienst: "Nein",
+      internet: "Ja", tiere: "Andere", unterbringung: "Zimmer in den Räumlichkeiten",
+      aufgaben: "Begleitung Garten", wunschGeschlecht: "Weiblich",
+      rauchen: "Nein", sonstigeWuensche: "Hat Hühner und Wellensittich",
+    },
+    expect: {
+      patient_count: 1,
+      p0: { gender: "female", year_of_birth: 1940, care_level: 2,
+            mobility_id: 3, lift_id: 2, dementia: "no",
+            incontinence: false, night_operations: "no" },
+      cust: { accommodation: "single_family_house", urbanization_id: 1,
+              has_family_near_by: "yes", internet: "yes", day_care_facility: "no",
+              pets: "yes", is_pet_dog: false, is_pet_cat: false, is_pet_other: true,
+              caregiver_accommodated: "room_premises",
+              other_people_in_house: "no" },
+      wish: { gender: "female", smoking: "no" },
+    },
+  },
+  {
+    name: "F7: Pg3 mobil couple Düsseldorf, no extras",
+    fd: { pflegegrad: 3, mobilitaet: "mobil", nachteinsaetze: "gelegentlich",
+          betreuung_fuer: "ehepaar", weitere_personen: "nein", geschlecht: "egal",
+          deutschkenntnisse: "kommunikativ", fuehrerschein: "egal", erfahrung: "erfahren" },
+    stageB: { plz: "40213", city: "Düsseldorf", street: "Königsallee 60",
+              anrede: "Herr", vorname: "Hans", nachname: "Fischer" },
+    leadIdentity: { anrede: "Frau", vorname: "Inge", nachname: "Fischer" },
+    form: {
+      anzahl: "2",
+      geschlecht: "Männlich", geburtsjahr: "1950", pflegegrad: "Pflegegrad 3",
+      gewicht: "81-90 kg", groesse: "181-190 cm", mobilitaet: "Selbstständig mobil",
+      heben: "Nein", demenz: "Nein", inkontinenz: "Nein", nacht: "Nein",
+      p2_geschlecht: "Weiblich", p2_geburtsjahr: "1952", p2_pflegegrad: "Pflegegrad 3",
+      p2_gewicht: "71-80 kg", p2_groesse: "161-170 cm", p2_mobilitaet: "Selbstständig mobil",
+      p2_heben: "Nein", p2_demenz: "Nein", p2_inkontinenz: "Nein", p2_nacht: "Nein",
+      diagnosen: "Beide Diabetes", plz: "40213", ort: "Düsseldorf",
+      haushalt: "Ehepartner/in", wohnungstyp: "Einfamilienhaus",
+      urbanisierung: "Großstadt", familieNahe: "Ja", pflegedienst: "Nein",
+      internet: "Ja", tiere: "Keine", unterbringung: "Zimmer in den Räumlichkeiten",
+      aufgaben: "Hauswirtschaft, Begleitung", wunschGeschlecht: "Egal",
+      rauchen: "Nein", sonstigeWuensche: "Beide noch sehr aktiv",
+    },
+    expect: {
+      patient_count: 2,
+      p0: { gender: "male", year_of_birth: 1950, care_level: 3,
+            mobility_id: 1, lift_id: 2, dementia: "no",
+            incontinence: false, night_operations: "no" },
+      p1: { gender: "female", year_of_birth: 1952, care_level: 3,
+            mobility_id: 1, lift_id: 2, dementia: "no",
+            incontinence: false, night_operations: "no" },
+      cust: { accommodation: "single_family_house", urbanization_id: 3,
+              has_family_near_by: "yes", internet: "yes", day_care_facility: "no",
+              pets: "no", caregiver_accommodated: "room_premises",
+              other_people_in_house: "yes" },
+      wish: { gender: "not_important", smoking: "no" },
+    },
+  },
+  {
+    name: "F8: Pg5 bettlaegerig single female Dresden, severe dementia, both inc",
+    fd: { pflegegrad: 5, mobilitaet: "bettlaegerig", nachteinsaetze: "mehrmals",
+          betreuung_fuer: "1-person", weitere_personen: "nein", geschlecht: "weiblich",
+          deutschkenntnisse: "sehr-gut", fuehrerschein: "egal", erfahrung: "sehr-erfahren",
+          demenz: "ja" },
+    stageB: { plz: "01067", city: "Dresden", street: "Prager Straße 5",
+              anrede: "Frau", vorname: "Hannelore", nachname: "Lang" },
+    leadIdentity: { anrede: "Frau", vorname: "Hannelore", nachname: "Lang" },
+    form: {
+      anzahl: "1",
+      geschlecht: "Weiblich", geburtsjahr: "1935", pflegegrad: "Pflegegrad 5",
+      gewicht: "51-60 kg", groesse: "151-160 cm", mobilitaet: "Bettlägerig",
+      heben: "Ja", demenz: "Schwer", inkontinenz: "Beides", nacht: "Mehr als 2",
+      p2_geschlecht: "", p2_geburtsjahr: "", p2_pflegegrad: "", p2_gewicht: "",
+      p2_groesse: "", p2_mobilitaet: "", p2_heben: "", p2_demenz: "",
+      p2_inkontinenz: "", p2_nacht: "",
+      diagnosen: "Alzheimer fortgeschritten, Schlaganfall", plz: "01067", ort: "Dresden",
+      haushalt: "Allein", wohnungstyp: "Wohnung in Mehrfamilienhaus",
+      urbanisierung: "Großstadt", familieNahe: "Ja", pflegedienst: "Ja",
+      internet: "Ja", tiere: "Keine", unterbringung: "Gesamter Bereich",
+      aufgaben: "Vollpflege, Lagerung alle 2h, Sondennahrung",
+      wunschGeschlecht: "Weiblich", rauchen: "Nein",
+      sonstigeWuensche: "Pflegeerfahrung mit Demenzpatienten zwingend",
+    },
+    expect: {
+      patient_count: 1,
+      p0: { gender: "female", year_of_birth: 1935, care_level: 5,
+            mobility_id: 5, lift_id: 1, dementia: "yes",
+            incontinence: true, incontinence_feces: true, incontinence_urine: true,
+            night_operations: "more_than_2" },
+      cust: { accommodation: "apartment", urbanization_id: 3,
+              has_family_near_by: "yes", internet: "yes", day_care_facility: "yes",
+              pets: "no", caregiver_accommodated: "area_premises",
+              other_people_in_house: "no" },
+      wish: { gender: "female", smoking: "no" },
+      dementia_desc_contains: "schwer",
+    },
+  },
+  {
+    name: "F9: Pg1 mobil single Hannover Kleinstadt, smoking allowed",
+    fd: { pflegegrad: 1, mobilitaet: "mobil", nachteinsaetze: "nein",
+          betreuung_fuer: "1-person", weitere_personen: "nein", geschlecht: "maennlich",
+          deutschkenntnisse: "grundlegend", fuehrerschein: "egal", erfahrung: "einsteiger" },
+    stageB: { plz: "30159", city: "Hannover", street: "Bahnhofstraße 8",
+              anrede: "Herr", vorname: "Dieter", nachname: "Becker" },
+    leadIdentity: { anrede: "Herr", vorname: "Dieter", nachname: "Becker" },
+    form: {
+      anzahl: "1",
+      geschlecht: "Männlich", geburtsjahr: "1960", pflegegrad: "Pflegegrad 1",
+      gewicht: "91-100 kg", groesse: "181-190 cm", mobilitaet: "Selbstständig mobil",
+      heben: "Nein", demenz: "Nein", inkontinenz: "Nein", nacht: "Nein",
+      p2_geschlecht: "", p2_geburtsjahr: "", p2_pflegegrad: "", p2_gewicht: "",
+      p2_groesse: "", p2_mobilitaet: "", p2_heben: "", p2_demenz: "",
+      p2_inkontinenz: "", p2_nacht: "",
+      diagnosen: "leichte Einschränkungen", plz: "30159", ort: "Hannover",
+      haushalt: "Allein", wohnungstyp: "Einfamilienhaus",
+      urbanisierung: "Kleinstadt", familieNahe: "Nein", pflegedienst: "Nein",
+      internet: "Ja", tiere: "Hund", unterbringung: "Zimmer in den Räumlichkeiten",
+      aufgaben: "Begleitung, leichte Hausarbeit", wunschGeschlecht: "Männlich",
+      rauchen: "Ja", sonstigeWuensche: "Raucher unter sich",
+    },
+    expect: {
+      patient_count: 1,
+      p0: { gender: "male", year_of_birth: 1960, care_level: 1,
+            mobility_id: 1, lift_id: 2, dementia: "no",
+            incontinence: false, night_operations: "no" },
+      cust: { accommodation: "single_family_house", urbanization_id: 2,
+              has_family_near_by: "no", internet: "yes", day_care_facility: "no",
+              pets: "yes", is_pet_dog: true, caregiver_accommodated: "room_premises",
+              other_people_in_house: "no" },
+      wish: { gender: "male", smoking: "yes_outside" },
+    },
+  },
+  {
+    name: "F10: Pg4 rollstuhl couple Leipzig, mixed mobility/dementia",
+    fd: { pflegegrad: 4, mobilitaet: "rollstuhl", nachteinsaetze: "taeglich",
+          betreuung_fuer: "ehepaar", weitere_personen: "nein", geschlecht: "egal",
+          deutschkenntnisse: "kommunikativ", fuehrerschein: "ja", erfahrung: "erfahren",
+          demenz: "ja" },
+    stageB: { plz: "04109", city: "Leipzig", street: "Hainstraße 1",
+              anrede: "Frau", vorname: "Brigitte", nachname: "Schulz" },
+    leadIdentity: { anrede: "Herr", vorname: "Manfred", nachname: "Schulz" },
+    form: {
+      anzahl: "2",
+      geschlecht: "Weiblich", geburtsjahr: "1944", pflegegrad: "Pflegegrad 4",
+      gewicht: "61-70 kg", groesse: "161-170 cm", mobilitaet: "Rollstuhlfähig",
+      heben: "Ja", demenz: "Mittelgradig", inkontinenz: "Harninkontinenz",
+      nacht: "1–2 Mal",
+      p2_geschlecht: "Männlich", p2_geburtsjahr: "1940", p2_pflegegrad: "Pflegegrad 3",
+      p2_gewicht: "71-80 kg", p2_groesse: "171-180 cm", p2_mobilitaet: "Rollatorfähig",
+      p2_heben: "Nein", p2_demenz: "Leichtgradig", p2_inkontinenz: "Nein",
+      p2_nacht: "Bis zu 1 Mal",
+      diagnosen: "Sie: Demenz, MS. Er: leichte Einschränkungen",
+      plz: "04109", ort: "Leipzig",
+      haushalt: "Ehepartner/in", wohnungstyp: "Einfamilienhaus",
+      urbanisierung: "Großstadt", familieNahe: "Ja", pflegedienst: "Geplant",
+      internet: "Ja", tiere: "Katze", unterbringung: "Bereich extern",
+      aufgaben: "Beide pflegen, sie braucht mehr Hilfe",
+      wunschGeschlecht: "Weiblich", rauchen: "Nein",
+      sonstigeWuensche: "Demenzerfahrung notwendig, Auto benutzen",
+    },
+    expect: {
+      patient_count: 2,
+      p0: { gender: "female", year_of_birth: 1944, care_level: 4,
+            mobility_id: 4, lift_id: 1, dementia: "yes",
+            incontinence: true, incontinence_urine: true, incontinence_feces: false,
+            night_operations: "1_2_times" },
+      p1: { gender: "male", year_of_birth: 1940, care_level: 3,
+            mobility_id: 3, lift_id: 2, dementia: "yes",
+            incontinence: false, night_operations: "up_to_1_time" },
+      cust: { accommodation: "single_family_house", urbanization_id: 3,
+              has_family_near_by: "yes", internet: "yes", day_care_facility: "yes",
+              pets: "yes", is_pet_cat: true, caregiver_accommodated: "area_other_premises",
+              other_people_in_house: "yes" },
+      wish: { gender: "female", smoking: "no" },
+      dementia_desc_contains: "mittel",
+    },
+  },
+];
+
+// ─── Verification helpers ─────────────────────────────────────────────────
+
+function check(label, got, want) {
+  const ok = got === want;
+  return { ok, label, got, want };
+}
+function checkContains(label, hay, needle) {
+  const ok = typeof hay === "string" && hay.toLowerCase().includes(needle.toLowerCase());
+  return { ok, label, got: hay, want: `contains "${needle}"` };
+}
+
+// ─── Run all 10 fixtures ──────────────────────────────────────────────────
+
+const results = [];
+
+for (let i = 0; i < fixtures.length; i++) {
+  const fix = fixtures[i];
+  const suffix = String(i + 1).padStart(2, "0");
+  const checks = [];
+  let leadId = null;
+  let leadEmail = null;
+  let customerId = null;
+  let runError = null;
+  const phases = [];
+
+  console.log(`\n${"═".repeat(80)}`);
+  console.log(`${i + 1}/10 ${fix.name}`);
+  console.log(`${"═".repeat(80)}`);
+
+  try {
+    // 1. Insert lead
+    const row = buildLeadRow(fix, suffix);
+    const inserted = await supabaseInsert("leads", row);
+    leadId = inserted.id;
+    leadEmail = inserted.email;
+    phases.push(`✓ lead ${leadId} inserted (token=${inserted.token.slice(0, 8)}…)`);
+
+    // 2. Onboard
+    const { body: onboardBody, setCookie } = await callOnboard(inserted.token);
+    customerId = onboardBody.customer_id;
+    const sessionCookie = extractSessionCookie(setCookie);
+    phases.push(`✓ onboard → customer #${customerId} job_offer #${onboardBody.job_offer_id}`);
+    if (!sessionCookie) throw new Error("no session cookie returned");
+
+    // 3. Patient form save (proxy.updateCustomer with mapped patch)
+    // Need patient IDs for UpdateCustomer to not silently drop fields.
+    const before = await callProxy("getCustomer", {}, sessionCookie);
+    const existingPatientIds = (before.Customer?.patients ?? []).map(p => p.id);
+
+    const formPatch = mapPatientFormToUpdateCustomerInput(fix.form, {
+      locationId: before.Customer?.location_id ?? null,
+      existingPatientIds,
+    });
+    await callProxy("updateCustomer", formPatch, sessionCookie);
+    phases.push(`✓ patient form save (proxy.updateCustomer)`);
+
+    // 4. Verify final state
+    const after = await callProxy("getCustomer", {}, sessionCookie);
+    const c = after.Customer;
+    if (!c) throw new Error("getCustomer returned no Customer");
+
+    // ─── Assertions ─────────────────────────────────────────────────
+    checks.push(check("status === active", c.status, "active"));
+    checks.push(check("patients.length", c.patients.length, fix.expect.patient_count));
+
+    const patients = [...c.patients].sort((a, b) => a.id - b.id);
+    for (const idx of [0, 1]) {
+      const expP = fix.expect[`p${idx}`];
+      if (!expP) continue;
+      const p = patients[idx];
+      if (!p) {
+        checks.push({ ok: false, label: `p[${idx}] exists`, got: "missing", want: "patient" });
+        continue;
+      }
+      for (const [k, want] of Object.entries(expP)) {
+        checks.push(check(`p[${idx}].${k}`, p[k], want));
+      }
+    }
+
+    if (fix.expect.dementia_desc_contains) {
+      const allDesc = c.patients.map(p => p.dementia_description ?? "").join(" | ");
+      checks.push(checkContains("dementia_description", allDesc, fix.expect.dementia_desc_contains));
+    }
+
+    if (fix.expect.cust) {
+      for (const [k, want] of Object.entries(fix.expect.cust)) {
+        checks.push(check(`customer.${k}`, c[k], want));
+      }
+    }
+    checks.push({
+      ok: typeof c.location_id === "number",
+      label: "customer.location_id is a number",
+      got: c.location_id, want: "number",
+    });
+
+    if (fix.expect.wish) {
+      for (const [k, want] of Object.entries(fix.expect.wish)) {
+        checks.push(check(`wish.${k}`, c.customer_caregiver_wish?.[k], want));
+      }
+    }
+    if (fix.expect.wish_tasks_contains) {
+      checks.push(checkContains("wish.tasks", c.customer_caregiver_wish?.tasks ?? "", fix.expect.wish_tasks_contains));
+    }
+    if (fix.expect.job_description_contains) {
+      checks.push(checkContains("job_description", c.job_description ?? "", fix.expect.job_description_contains));
+    }
+  } catch (e) {
+    runError = e.message;
+  }
+
+  const allOk = !runError && checks.every(c => c.ok);
+  const result = {
+    name: fix.name,
+    leadId,
+    leadEmail,
+    customerId,
+    portalUrl: customerId ? `https://beta.mamamia.app/customer/${customerId}` : null,
+    ok: allOk,
+    runError,
+    phases,
+    checks,
+  };
+  results.push(result);
+
+  for (const ph of phases) console.log("  " + ph);
+  if (runError) {
+    console.log(`  ✗ RUN ERROR: ${runError}`);
+  } else {
+    console.log(`  ${allOk ? "✅" : "❌"} customer #${customerId}`);
+    for (const c of checks) {
+      const mark = c.ok ? "✓" : "✗";
+      const got = JSON.stringify(c.got);
+      const want = typeof c.want === "string" && c.want.startsWith("contains")
+        ? c.want : JSON.stringify(c.want);
+      console.log(`    ${mark} ${c.label}: ${got}${c.ok ? "" : ` (expected ${want})`}`);
+    }
+  }
+}
+
+// ─── Aggregate ───────────────────────────────────────────────────────────
+const passed = results.filter(r => r.ok).length;
+console.log(`\n${"═".repeat(80)}`);
+console.log(` MATRIX RESULT: ${passed}/${results.length} fixtures fully passed`);
+console.log(`${"═".repeat(80)}`);
+for (const r of results) {
+  const total = r.checks.length;
+  const ok = r.checks.filter(c => c.ok).length;
+  const id = r.customerId ? `#${r.customerId}` : "—";
+  const status = r.runError ? "💥 ERROR" : (r.ok ? "✅" : `❌ (${ok}/${total})`);
+  console.log(`  ${status.padEnd(15)} ${id.padEnd(8)} ${r.name}`);
+  if (r.runError) console.log(`     → ${r.runError}`);
+}
+
+// ─── Markdown report ─────────────────────────────────────────────────────
+const md = [];
+md.push(`# 10-customer end-to-end matrix — via product flow`);
+md.push(``);
+md.push(`Generated: ${new Date().toISOString()}`);
+md.push(``);
+md.push(`Path: \`leads (insert) → onboard-to-mamamia → mamamia-proxy (updateCustomer + getCustomer)\``);
+md.push(``);
+md.push(`Result: **${passed}/${results.length}** fixtures fully passed`);
+md.push(``);
+md.push(`## Summary`);
+md.push(``);
+md.push(`| # | Fixture | Lead ID | Customer | Result | Pass / Total |`);
+md.push(`|---|---|---|---|---|---|`);
+for (let i = 0; i < results.length; i++) {
+  const r = results[i];
+  const total = r.checks.length;
+  const okCount = r.checks.filter(c => c.ok).length;
+  const cid = r.customerId ? `[${r.customerId}](${r.portalUrl})` : "—";
+  const lid = r.leadId ? `\`${r.leadId.slice(0, 8)}…\`` : "—";
+  const status = r.runError ? "💥 error" : (r.ok ? "✅" : "❌");
+  md.push(`| ${i + 1} | ${r.name} | ${lid} | ${cid} | ${status} | ${okCount}/${total} |`);
+}
+md.push(``);
+md.push(`## Per-fixture detail`);
+md.push(``);
+for (let i = 0; i < results.length; i++) {
+  const r = results[i];
+  md.push(`### ${i + 1}. ${r.name}`);
+  md.push(``);
+  md.push(`- Lead: \`${r.leadId}\` (${r.leadEmail})`);
+  md.push(`- Customer: ${r.customerId ? `[${r.customerId}](${r.portalUrl})` : "—"}`);
+  md.push(``);
+  md.push("```");
+  for (const ph of r.phases) md.push(ph);
+  if (r.runError) md.push(`✗ RUN ERROR: ${r.runError}`);
+  md.push("```");
+  md.push(``);
+  if (r.checks.length === 0) { md.push(``); continue; }
+  md.push(`| Check | Got | Expected | OK |`);
+  md.push(`|---|---|---|---|`);
+  for (const c of r.checks) {
+    const got = JSON.stringify(c.got);
+    const want = typeof c.want === "string" && c.want.startsWith("contains")
+      ? c.want : JSON.stringify(c.want);
+    md.push(`| \`${c.label}\` | \`${got}\` | \`${want}\` | ${c.ok ? "✅" : "❌"} |`);
+  }
+  md.push(``);
+}
+
+const outPath = "/Users/michalkepinski/Documents/Projects/CAapp/docs/matrix-10-end-to-end-2026-04-29.md";
+await Deno.writeTextFile(outPath, md.join("\n"));
+console.log(`\nWrote ${outPath}`);
