@@ -16,6 +16,13 @@ import type {
   MamamiaLocation,
   PaginatedResponse,
 } from './types';
+import {
+  fetchCaregiver,
+  getCached,
+  getError as getCachedError,
+  isPending as isCachePending,
+  subscribe as subscribeCaregiver,
+} from './caregiverCache';
 
 export interface QueryState<T> {
   data: T | null;
@@ -129,13 +136,87 @@ export function useInvitedCaregivers(enabled = true) {
   return { ...state, data: state.data?.caregiver_ids ?? null };
 }
 
-export function useCaregiver(id: number | null) {
-  const state = useMamamiaQuery<{ Caregiver: MamamiaCaregiverFull | null }>(
-    id ? 'getCaregiver' : null,
-    { id: id ?? 0 },
-    id !== null,
+// Cached, dedupable fetch for the modal's heavy GET_CAREGIVER. Reads from
+// `caregiverCache` first — if the id was prefetched (e.g. for visible
+// matching/application cards), modal opens with data instantly instead of
+// paying the 1.7-3.1s round-trip. Falls through to a real fetch on miss.
+export function useCaregiver(id: number | null): QueryState<MamamiaCaregiverFull | null> {
+  const [data, setData] = useState<MamamiaCaregiverFull | null>(
+    id != null ? (getCached(id) ?? null) : null,
   );
-  return { ...state, data: state.data?.Caregiver ?? null };
+  const [loading, setLoading] = useState<boolean>(
+    id != null && getCached(id) === undefined,
+  );
+  const [error, setError] = useState<Error | null>(
+    id != null ? getCachedError(id) : null,
+  );
+
+  // Re-evaluate on id change.
+  useEffect(() => {
+    if (id == null) {
+      setData(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    // Cache hit — instant render, no spinner.
+    const cached = getCached(id);
+    if (cached !== undefined) {
+      setData(cached);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    let cancelled = false;
+    const unsub = subscribeCaregiver(id, () => {
+      if (cancelled) return;
+      const v = getCached(id);
+      if (v !== undefined) {
+        setData(v);
+        setLoading(false);
+      }
+      const e = getCachedError(id);
+      if (e) {
+        setError(e);
+        setLoading(false);
+      }
+    });
+
+    fetchCaregiver(id).catch(() => {/* error already in cache */});
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [id]);
+
+  const refetch = useCallback(() => {
+    if (id == null) return;
+    // Bypass cache — kick a fresh fetch by clearing pending state via the
+    // module's own retry path. We trigger by importing _resetCache only in
+    // tests; in prod we just refetch which dedupes if pending.
+    setLoading(true);
+    setError(null);
+    fetchCaregiver(id)
+      .then((v) => { setData(v); setLoading(false); })
+      .catch((e) => { setError(e); setLoading(false); });
+  }, [id]);
+
+  // Surface the in-flight state correctly when other consumers triggered
+  // the fetch via prefetch — `loading` should reflect cache pending.
+  useEffect(() => {
+    if (id == null) return;
+    if (data == null && getCached(id) === undefined && isCachePending(id)) {
+      setLoading(true);
+    }
+  }, [id, data]);
+
+  return { data, loading, error, refetch };
 }
 
 export function useSearchLocations(

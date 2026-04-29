@@ -25,6 +25,133 @@ const GERMANY_SKILL_LEVELS: Record<string, { level: string; bars: number }> = {
   level_4: { level: 'B2-C1', bars: 5 },
 };
 
+// ─── Mamamia → German translation maps ───────────────────────────────────
+// Mamamia returns enum keys (e.g. "high_school") and English-language
+// labels (e.g. "Polish", "cooking", "Wheelchair") on Caregiver lookup
+// tables. The portal UI is German, so we translate at the mapper boundary
+// and fall back to the original string when an unknown value appears.
+
+// Caregiver.nationality.nationality — English country adjectives in prod
+// (verified beta sample 2026-04-29). Common cases hand-translated; rare
+// values fall through unchanged so we never surprise-mistranslate.
+const NATIONALITY_DE: Record<string, string> = {
+  Polish: 'Polnisch',
+  Bulgarian: 'Bulgarisch',
+  Romanian: 'Rumänisch',
+  Slovak: 'Slowakisch',
+  Czech: 'Tschechisch',
+  Hungarian: 'Ungarisch',
+  Ukrainian: 'Ukrainisch',
+  Russian: 'Russisch',
+  Lithuanian: 'Litauisch',
+  Latvian: 'Lettisch',
+  Estonian: 'Estnisch',
+  German: 'Deutsch',
+  Croatian: 'Kroatisch',
+  Slovenian: 'Slowenisch',
+  Serbian: 'Serbisch',
+  'Bosnian and Herzegovinian': 'Bosnisch',
+  Belarusian: 'Belarussisch',
+  Moldovan: 'Moldauisch',
+  Albanian: 'Albanisch',
+  Macedonian: 'Mazedonisch',
+};
+
+// Caregiver.education enum — verified beta values: high_school, studies,
+// (also seen in prod sweep): primary_school, vocational, higher.
+const EDUCATION_DE: Record<string, string> = {
+  primary_school: 'Grundschule',
+  high_school: 'Gymnasium / Abitur',
+  vocational: 'Berufsausbildung',
+  studies: 'Studium',
+  higher: 'Hochschule',
+};
+
+// Caregiver.driving_license enum — verified beta:
+//   no, yes (legacy), yes_automatic, yes_manual, yes_automatic_manual.
+// Modal renders "Ja (Automatik / Schaltung / Beide)" so the gearbox info
+// from the same enum field surfaces (Mamamia stores it inline, not in
+// driving_license_gearbox which is a separate field for caregiver-wish).
+const DRIVING_GEARBOX_DE: Record<string, string> = {
+  yes_automatic: 'Automatik',
+  yes_manual: 'Schaltung',
+  yes_automatic_manual: 'Automatik & Schaltung',
+};
+
+// Caregiver.mobilities[].mobility — English labels on Mamamia.
+// "Akzeptierte Mobilität" chips show what mobility levels CG accepts.
+const MOBILITY_DE: Record<string, string> = {
+  Mobile: 'Mobil',
+  'Walking stick': 'Gehstock',
+  Walker: 'Rollator',
+  Wheelchair: 'Rollstuhl',
+  Bedridden: 'Bettlägerig',
+};
+
+// Caregiver.personalities[].personality — values from beta sample.
+// Mapping covers the prod-most-common; unknown values pass through.
+const PERSONALITY_DE: Record<string, string> = {
+  friendly: 'freundlich',
+  patient: 'geduldig',
+  calm: 'ruhig',
+  energetic: 'energiegeladen',
+  empathetic: 'einfühlsam',
+  reliable: 'zuverlässig',
+  cheerful: 'fröhlich',
+  serious: 'ernst',
+  honest: 'ehrlich',
+  responsible: 'verantwortungsvoll',
+  open: 'offen',
+  caring: 'fürsorglich',
+  attentive: 'aufmerksam',
+  organized: 'organisiert',
+  flexible: 'flexibel',
+  hardworking: 'fleißig',
+  confident: 'selbstbewusst',
+  dynamic: 'dynamisch',
+  independent: 'selbstständig',
+  warm: 'herzlich',
+};
+
+// Caregiver.hobbies[].hobby — values from beta sample.
+const HOBBY_DE: Record<string, string> = {
+  cooking: 'Kochen',
+  reading: 'Lesen',
+  gardening: 'Gärtnern',
+  music: 'Musik',
+  cinema: 'Kino',
+  travel: 'Reisen',
+  family: 'Familie',
+  sport: 'Sport',
+  walking: 'Spazierengehen',
+  swimming: 'Schwimmen',
+  painting: 'Malen',
+  knitting: 'Stricken',
+  sewing: 'Nähen',
+  baking: 'Backen',
+  dancing: 'Tanzen',
+  yoga: 'Yoga',
+  pets: 'Tiere',
+  crossword: 'Kreuzworträtsel',
+  handicraft: 'Handarbeit',
+  photography: 'Fotografie',
+};
+
+// Caregiver.marital_status — English enum from beta sample.
+const MARITAL_DE: Record<string, string> = {
+  single: 'Ledig',
+  married: 'Verheiratet',
+  divorced: 'Geschieden',
+  widowed: 'Verwitwet',
+  separated: 'Getrennt lebend',
+  partnership: 'In Partnerschaft',
+};
+
+function translate(map: Record<string, string>, value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  return map[value] ?? value;
+}
+
 function computeAge(birthDate: string | null, yearOfBirth: number | null, nowYear: number): number {
   if (birthDate) {
     const d = new Date(birthDate);
@@ -129,28 +256,43 @@ export function mapCaregiverToNurse(
   let profile: Nurse['profile'];
   if ('hobbies' in cg || 'personalities' in cg || 'nationality' in cg) {
     const full = cg as MamamiaCaregiverFull;
+    // weight/height come as buckets ("81-90", "171-180") — append units so
+    // the user reads "81-90 kg" / "171-180 cm" instead of bare numbers.
+    const weightLabel = full.weight ? `${full.weight} kg` : undefined;
+    const heightLabel = full.height ? `${full.height} cm` : undefined;
     profile = {
-      nationality: full.nationality?.nationality ?? undefined,
+      nationality: translate(NATIONALITY_DE, full.nationality?.nationality),
       yearOfBirth: full.year_of_birth ?? undefined,
-      weight: full.weight ?? undefined,
-      height: full.height ?? undefined,
-      maritalStatus: full.marital_status ?? undefined,
+      weight: weightLabel,
+      height: heightLabel,
+      maritalStatus: translate(MARITAL_DE, full.marital_status),
+      // driving_license enum: no | yes | yes_automatic | yes_manual |
+      // yes_automatic_manual. Anything starting with "yes" → has license.
       drivingLicense: full.driving_license != null
         ? full.driving_license !== 'no'
         : undefined,
+      drivingLicenseGearbox: full.driving_license
+        ? DRIVING_GEARBOX_DE[full.driving_license]
+        : undefined,
       isNurse: full.is_nurse ?? undefined,
       smoking: full.smoking ?? undefined,
-      education: full.education ?? undefined,
+      education: translate(EDUCATION_DE, full.education),
       qualifications: full.qualifications ?? undefined,
       motivation: full.motivation ?? undefined,
       aboutDe: full.about_de ?? undefined,
       furtherHobbies: full.further_hobbies ?? undefined,
       hobbies: (full.hobbies ?? [])
-        .map(h => h.hobby).filter((x): x is string => Boolean(x)),
+        .map(h => h.hobby)
+        .filter((x): x is string => Boolean(x))
+        .map(h => translate(HOBBY_DE, h) ?? h),
       personalities: (full.personalities ?? [])
-        .map(p => p.personality).filter((x): x is string => Boolean(x)),
+        .map(p => p.personality)
+        .filter((x): x is string => Boolean(x))
+        .map(p => translate(PERSONALITY_DE, p) ?? p),
       acceptedMobilities: (full.mobilities ?? [])
-        .map(m => m.mobility).filter((x): x is string => Boolean(x)),
+        .map(m => m.mobility)
+        .filter((x): x is string => Boolean(x))
+        .map(m => translate(MOBILITY_DE, m) ?? m),
       otherLanguages: (full.languagables ?? [])
         .filter(l => l.language?.name && l.language.name.toLowerCase() !== 'german')
         .map(l => ({ name: l.language!.name!, level: l.level ?? '—' })),

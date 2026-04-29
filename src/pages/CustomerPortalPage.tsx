@@ -8,6 +8,7 @@ import {
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
+import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -105,7 +106,12 @@ const CustomerPortalPage: FC = () => {
   // the browser. Invite simply calls the proxy.
 
   // Lazy-load full caregiver profile when modal opens — replaces mockProfile().
-  const { data: fullCaregiver } = useCaregiver(selectedNurse?.caregiverId ?? null);
+  // Backed by `caregiverCache` so that prefetched ids (visible matchings +
+  // application caregivers) open instantly instead of paying GET_CAREGIVER's
+  // 1.7-3.1s round-trip every click.
+  const { data: fullCaregiver, loading: caregiverLoading } = useCaregiver(
+    selectedNurse?.caregiverId ?? null,
+  );
   const enrichedSelectedNurse = (() => {
     if (!selectedNurse) return null;
     if (!fullCaregiver) return selectedNurse;
@@ -146,6 +152,23 @@ const CustomerPortalPage: FC = () => {
       });
     });
   }, [mmReady, mmApplications]);
+
+  // Background prefetch full caregiver profiles for visible matchings +
+  // applications. GET_CAREGIVER takes 1.7-3.1s on Mamamia beta — without
+  // prefetch, every modal open pays full latency. With prefetch, by the
+  // time the user clicks the data is already cached.
+  // Concurrency capped inside prefetchCaregivers; safe even with 50 ids.
+  useEffect(() => {
+    if (!mmReady) return;
+    const ids = new Set<number>();
+    for (const m of effectiveMatched) ids.add(m.caregiverId);
+    if (mmApplications?.data) {
+      for (const a of mmApplications.data) ids.add(a.caregiver.id);
+    }
+    if (ids.size > 0) prefetchCaregivers([...ids]);
+    // intentionally not depending on `effectiveMatched` reference identity —
+    // its caregiverIds is what we care about, derived from mmMatchings.
+  }, [mmReady, mmMatchings, mmApplications]);
 
   // Seed nurseStatuses with 'invited' for caregivers that already have a
   // Request in Mamamia. Without this the badge state lives only in
@@ -610,6 +633,7 @@ const CustomerPortalPage: FC = () => {
       {selectedNurse && enrichedSelectedNurse && (
         <CustomerNurseModal
           nurse={enrichedSelectedNurse}
+          profileLoading={caregiverLoading && !fullCaregiver}
           onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); }}
           app={nurseModalApp ?? undefined}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); }}

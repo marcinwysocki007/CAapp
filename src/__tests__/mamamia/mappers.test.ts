@@ -168,6 +168,129 @@ describe('mapCaregiverToNurse', () => {
   });
 });
 
+describe('mapCaregiverToNurse — full profile (translations + units)', () => {
+  function makeFullCg(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      ...makeCg(),
+      // Promote to "full" by adding fields the type-narrow uses for detection
+      hobbies: [],
+      personalities: [],
+      mobilities: [],
+      languagables: [],
+      nationality: null,
+      ...overrides,
+    };
+  }
+
+  it('translates Polish nationality → Polnisch', () => {
+    const n = mapCaregiverToNurse(
+      // deno-lint-ignore no-explicit-any
+      makeFullCg({ nationality: { nationality: 'Polish' } }) as any,
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.profile?.nationality).toBe('Polnisch');
+  });
+
+  it('falls through unknown nationality unchanged', () => {
+    const n = mapCaregiverToNurse(
+      // deno-lint-ignore no-explicit-any
+      makeFullCg({ nationality: { nationality: 'Klingon' } }) as any,
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.profile?.nationality).toBe('Klingon');
+  });
+
+  it('appends "kg" / "cm" units to weight/height bucket strings', () => {
+    const n = mapCaregiverToNurse(
+      // deno-lint-ignore no-explicit-any
+      makeFullCg({ weight: '81-90', height: '171-180' }) as any,
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.profile?.weight).toBe('81-90 kg');
+    expect(n.profile?.height).toBe('171-180 cm');
+  });
+
+  it('translates education enum to German label', () => {
+    const cases: Array<[string, string]> = [
+      ['high_school', 'Gymnasium / Abitur'],
+      ['studies', 'Studium'],
+      ['vocational', 'Berufsausbildung'],
+      ['primary_school', 'Grundschule'],
+    ];
+    for (const [raw, label] of cases) {
+      const n = mapCaregiverToNurse(
+        // deno-lint-ignore no-explicit-any
+        makeFullCg({ education: raw }) as any,
+        { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+      );
+      expect(n.profile?.education).toBe(label);
+    }
+  });
+
+  it('translates personalities + hobbies to German', () => {
+    const n = mapCaregiverToNurse(
+      // deno-lint-ignore no-explicit-any
+      makeFullCg({
+        personalities: [
+          { personality: 'friendly' },
+          { personality: 'independent' },
+          { personality: 'totally-unknown-trait' },
+        ],
+        hobbies: [
+          { hobby: 'cooking' },
+          { hobby: 'crossword' },
+        ],
+      }) as any,
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.profile?.personalities).toEqual(['freundlich', 'selbstständig', 'totally-unknown-trait']);
+    expect(n.profile?.hobbies).toEqual(['Kochen', 'Kreuzworträtsel']);
+  });
+
+  it('translates accepted mobilities to German', () => {
+    const n = mapCaregiverToNurse(
+      // deno-lint-ignore no-explicit-any
+      makeFullCg({
+        mobilities: [
+          { mobility: 'Mobile' },
+          { mobility: 'Wheelchair' },
+          { mobility: 'Bedridden' },
+        ],
+      }) as any,
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.profile?.acceptedMobilities).toEqual(['Mobil', 'Rollstuhl', 'Bettlägerig']);
+  });
+
+  it('drivingLicense: parses gearbox label from enum', () => {
+    const cases: Array<[string, boolean, string | undefined]> = [
+      ['no', false, undefined],
+      ['yes', true, undefined],
+      ['yes_automatic', true, 'Automatik'],
+      ['yes_manual', true, 'Schaltung'],
+      ['yes_automatic_manual', true, 'Automatik & Schaltung'],
+    ];
+    for (const [raw, hasLic, gearbox] of cases) {
+      const n = mapCaregiverToNurse(
+        // deno-lint-ignore no-explicit-any
+        makeFullCg({ driving_license: raw }) as any,
+        { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+      );
+      expect(n.profile?.drivingLicense).toBe(hasLic);
+      expect(n.profile?.drivingLicenseGearbox).toBe(gearbox);
+    }
+  });
+
+  it('translates marital_status to German', () => {
+    const n = mapCaregiverToNurse(
+      // deno-lint-ignore no-explicit-any
+      makeFullCg({ marital_status: 'married' }) as any,
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.profile?.maritalStatus).toBe('Verheiratet');
+  });
+});
+
 describe('formatMamamiaDate', () => {
   it('parses Mamamia "YYYY-MM-DD HH:mm:ss" format', () => {
     expect(formatMamamiaDate('2026-05-01 00:00:00')).toBe('01.05.2026');

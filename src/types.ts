@@ -39,6 +39,10 @@ export interface Nurse {
     height?: string;
     maritalStatus?: string;
     drivingLicense?: boolean;
+    /** Gearbox label appended to "Ja" — "Automatik", "Schaltung", "Beide".
+     *  Comes from Mamamia's `driving_license` enum: yes_automatic /
+     *  yes_manual / yes_automatic_manual. */
+    drivingLicenseGearbox?: string;
     isNurse?: boolean;
     smoking?: 'no' | 'yes' | 'yes_outside';
     education?: string;

@@ -7,6 +7,12 @@ import { nurseLevel, displayName, initials } from './shared';
 
 export const CustomerNurseModal: FC<{
   nurse: Nurse;
+  /** True while the full Caregiver profile is in flight. The header and
+   *  basic nurse data render immediately from the matching/application
+   *  card; the deep "Über mich" / "Besondere Merkmale" sections wait on
+   *  GET_CAREGIVER (~1.7-3.1s on beta). When this is true we render a
+   *  shimmer skeleton for those sections instead of empty rows. */
+  profileLoading?: boolean;
   onClose: () => void;
   app?: Application;
   onReview?: () => void;
@@ -18,7 +24,7 @@ export const CustomerNurseModal: FC<{
   onInvite?: () => Promise<void>;
   onDeclineMatch?: () => void;
   isInvited?: boolean;
-}> = ({ nurse, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false }) => {
+}> = ({ nurse, profileLoading = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
 
@@ -67,6 +73,25 @@ export const CustomerNurseModal: FC<{
           <div className="flex flex-wrap gap-1.5 mt-1">
             {chips.map(c => <span key={c} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">{c}</span>)}
           </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Shimmer placeholder for profile sections while GET_CAREGIVER is in flight.
+  const SkeletonRow = ({ chips = false }: { chips?: boolean }) => (
+    <div className="flex gap-3.5 py-3 border-b border-gray-100 last:border-0 animate-pulse">
+      <div className="w-7 h-7 rounded bg-gray-200 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="h-2 w-20 bg-gray-200 rounded mb-2" />
+        {chips ? (
+          <div className="flex gap-1.5 mt-1">
+            <div className="h-5 w-14 bg-gray-200 rounded-full" />
+            <div className="h-5 w-20 bg-gray-200 rounded-full" />
+            <div className="h-5 w-16 bg-gray-200 rounded-full" />
+          </div>
+        ) : (
+          <div className="h-3 w-32 bg-gray-200 rounded" />
         )}
       </div>
     </div>
@@ -139,9 +164,17 @@ export const CustomerNurseModal: FC<{
           <div className="flex-1 overflow-y-auto">
             <div className="px-5 pt-4 pb-5">
               <h3 className="text-sm font-bold text-gray-900 mb-2">Über die Pflegekraft</h3>
-              <div className="bg-[#F5EDF6] rounded-xl p-4">
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{aboutSentence}</p>
-              </div>
+              {profileLoading && !p ? (
+                <div className="bg-[#F5EDF6] rounded-xl p-4 animate-pulse">
+                  <div className="h-3 w-full bg-purple-200/60 rounded mb-2" />
+                  <div className="h-3 w-11/12 bg-purple-200/60 rounded mb-2" />
+                  <div className="h-3 w-9/12 bg-purple-200/60 rounded" />
+                </div>
+              ) : (
+                <div className="bg-[#F5EDF6] rounded-xl p-4">
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{aboutSentence}</p>
+                </div>
+              )}
             </div>
 
             {nurse.detailedAssignments && nurse.detailedAssignments.length > 0 && (
@@ -171,51 +204,84 @@ export const CustomerNurseModal: FC<{
 
             <div className="px-5 pb-5">
               <h3 className="text-sm font-bold text-gray-900 mb-3">Über mich</h3>
-              <div className="divide-y divide-gray-100">
-                <InfoRow emoji="👤" label="Geschlecht" value={nurse.gender === 'female' ? 'Weiblich' : 'Männlich'} />
-                <InfoRow emoji="🌍" label="Nationalität" value={p?.nationality ?? dash} />
-                <InfoRow emoji="🎂" label="Geburtsjahr" value={p?.yearOfBirth ? String(p.yearOfBirth) : dash} />
-                <InfoRow emoji="⚖️" label="Gewicht" value={p?.weight ?? dash} />
-                <InfoRow emoji="📏" label="Größe" value={p?.height ?? dash} />
-                {p && p.personalities.length > 0 && (
-                  <InfoRow emoji="🧠" label="Persönlichkeit" chips={p.personalities} />
-                )}
-                {p && p.hobbies.length > 0 && (
-                  <InfoRow emoji="🎯" label="Hobbys" chips={p.hobbies} />
-                )}
-              </div>
+              {profileLoading ? (
+                <div className="divide-y divide-gray-100">
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow chips />
+                  <SkeletonRow chips />
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  <InfoRow emoji="👤" label="Geschlecht" value={nurse.gender === 'female' ? 'Weiblich' : 'Männlich'} />
+                  <InfoRow emoji="🌍" label="Nationalität" value={p?.nationality ?? dash} />
+                  <InfoRow emoji="🎂" label="Geburtsjahr" value={p?.yearOfBirth ? String(p.yearOfBirth) : dash} />
+                  <InfoRow emoji="⚖️" label="Gewicht" value={p?.weight ?? dash} />
+                  <InfoRow emoji="📏" label="Größe" value={p?.height ?? dash} />
+                  {p?.maritalStatus && (
+                    <InfoRow emoji="💍" label="Familienstand" value={p.maritalStatus} />
+                  )}
+                  {p && p.personalities.length > 0 && (
+                    <InfoRow emoji="🧠" label="Persönlichkeit" chips={p.personalities} />
+                  )}
+                  {p && p.hobbies.length > 0 && (
+                    <InfoRow emoji="🎯" label="Hobbys" chips={p.hobbies} />
+                  )}
+                  {p?.furtherHobbies && (
+                    <InfoRow emoji="✨" label="Weitere Interessen" value={p.furtherHobbies} />
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="px-5 pb-5">
               <h3 className="text-sm font-bold text-gray-900 mb-3">Besondere Merkmale</h3>
-              <div className="divide-y divide-gray-100">
-                <InfoRow emoji="🚗" label="Führerschein" value={yesNo(p?.drivingLicense)} />
-                <InfoRow emoji="🚬" label="Raucher" value={p?.smoking ? smokingLabel[p.smoking] ?? dash : dash} />
-                <InfoRow emoji="🎓" label="Pflegeberuf erlernt" value={yesNo(p?.isNurse)} />
-                {p?.qualifications && (
-                  <InfoRow emoji="🏥" label="Qualifikationen" value={p.qualifications} />
-                )}
-                {p?.education && (
-                  <InfoRow emoji="📚" label="Ausbildung" value={p.education} />
-                )}
-                {p && p.otherLanguages.length > 0 && (
-                  <InfoRow
-                    emoji="🌐"
-                    label="Andere Sprachkenntnisse"
-                    chips={p.otherLanguages.map(l => `${l.name} (${l.level})`)}
-                  />
-                )}
-              </div>
+              {profileLoading ? (
+                <div className="divide-y divide-gray-100">
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow chips />
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  <InfoRow emoji="🚗" label="Führerschein" value={p?.drivingLicense != null ? `${yesNo(p.drivingLicense)}${p.drivingLicenseGearbox ? ` (${p.drivingLicenseGearbox})` : ''}` : dash} />
+                  <InfoRow emoji="🚬" label="Raucher" value={p?.smoking ? smokingLabel[p.smoking] ?? dash : dash} />
+                  <InfoRow emoji="🎓" label="Pflegeberuf erlernt" value={yesNo(p?.isNurse)} />
+                  {p?.qualifications && (
+                    <InfoRow emoji="🏥" label="Qualifikationen" value={p.qualifications} />
+                  )}
+                  {p?.education && (
+                    <InfoRow emoji="📚" label="Ausbildung" value={p.education} />
+                  )}
+                  {p && p.otherLanguages.length > 0 && (
+                    <InfoRow
+                      emoji="🌐"
+                      label="Andere Sprachkenntnisse"
+                      chips={p.otherLanguages.map(l => `${l.name} (${l.level})`)}
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
-            {p && p.acceptedMobilities.length > 0 && (
+            {profileLoading ? (
+              <div className="px-5 pb-6">
+                <h3 className="text-sm font-bold text-gray-900 mb-3">Berufliche Anforderungen</h3>
+                <div className="divide-y divide-gray-100">
+                  <SkeletonRow chips />
+                </div>
+              </div>
+            ) : (p && p.acceptedMobilities.length > 0 && (
               <div className="px-5 pb-6">
                 <h3 className="text-sm font-bold text-gray-900 mb-3">Berufliche Anforderungen</h3>
                 <div className="divide-y divide-gray-100">
                   <InfoRow emoji="🦽" label="Akzeptierte Mobilität" chips={p.acceptedMobilities} />
                 </div>
               </div>
-            )}
+            ))}
           </div>
 
           <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
