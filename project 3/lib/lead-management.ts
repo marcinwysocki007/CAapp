@@ -1,0 +1,244 @@
+import { createClient } from '@supabase/supabase-js';
+import { Kalkulation, generateToken, getTokenExpiry } from './calculation';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export interface Lead {
+  id: string;
+  email: string;
+  vorname: string | null;
+  nachname: string | null;
+  anrede: string | null;
+  anrede_text: string | null;
+  telefon: string | null;
+  status: 'info_requested' | 'angebot_requested' | 'vertrag_abgeschlossen';
+  token: string | null;
+  token_expires_at: string | null;
+  token_used: boolean;
+  care_start_timing: string | null;
+  kalkulation: any;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function findOrCreateLead(
+  email: string,
+  targetStatus: 'info_requested' | 'angebot_requested' | 'vertrag_abgeschlossen',
+  data?: {
+    vorname?: string;
+    nachname?: string;
+    anrede?: string;
+    telefon?: string;
+    care_start_timing?: string;
+    kalkulation?: Kalkulation;
+  }
+): Promise<{ lead: Lead; isNew: boolean; isUpgrade: boolean }> {
+  const { data: existingLeads } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('email', email)
+    .order('created_at', { ascending: false });
+
+  const statusOrder = {
+    info_requested: 1,
+    angebot_requested: 2,
+    vertrag_abgeschlossen: 3,
+  };
+
+  if (existingLeads && existingLeads.length > 0) {
+    const latestLead = existingLeads[0];
+    const currentStatusLevel = statusOrder[latestLead.status as keyof typeof statusOrder];
+    const targetStatusLevel = statusOrder[targetStatus];
+
+    if (currentStatusLevel >= targetStatusLevel && latestLead.status !== 'vertrag_abgeschlossen') {
+      const updates: any = { updated_at: new Date().toISOString() };
+      if (data?.kalkulation) updates.kalkulation = data.kalkulation;
+      if (data?.vorname) updates.vorname = data.vorname;
+      if (data?.nachname) updates.nachname = data.nachname;
+      if (data?.anrede) { updates.anrede = data.anrede; updates.anrede_text = data.anrede; }
+      if (data?.telefon) updates.telefon = data.telefon;
+      if (data?.care_start_timing) updates.care_start_timing = data.care_start_timing;
+
+      const { data: updatedLead } = await supabase
+        .from('leads')
+        .update(updates)
+        .eq('id', latestLead.id)
+        .select()
+        .maybeSingle();
+
+      await logEvent(latestLead.id, `${targetStatus}_duplicate`, {
+        message: 'Lead bereits vorhanden, Kalkulation aktualisiert',
+      });
+      return { lead: updatedLead || latestLead, isNew: false, isUpgrade: false };
+    }
+
+    if (currentStatusLevel < targetStatusLevel) {
+      const updates: any = {
+        status: targetStatus,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (data?.vorname) updates.vorname = data.vorname;
+      if (data?.nachname) updates.nachname = data.nachname;
+      if (data?.anrede) { updates.anrede = data.anrede; updates.anrede_text = data.anrede; }
+      if (data?.telefon) updates.telefon = data.telefon;
+      if (data?.care_start_timing) updates.care_start_timing = data.care_start_timing;
+      if (data?.kalkulation) updates.kalkulation = data.kalkulation;
+
+      if (targetStatus === 'angebot_requested') {
+        updates.token = generateToken();
+        updates.token_expires_at = getTokenExpiry().toISOString();
+        updates.token_used = false;
+      }
+
+      const { data: updatedLead, error: updateError } = await supabase
+        .from('leads')
+        .update(updates)
+        .eq('id', latestLead.id)
+        .select()
+        .maybeSingle();
+
+      if (updateError) {
+        console.error('❌ Fehler beim Lead-Update:', updateError);
+        throw new Error(`Lead konnte nicht aktualisiert werden: ${updateError.message}`);
+      }
+
+      if (!updatedLead) {
+        console.error('❌ Lead wurde nicht aktualisiert (null zurückgegeben)');
+        throw new Error('Lead konnte nicht aktualisiert werden: Keine Daten zurückgegeben');
+      }
+
+      await logEvent(latestLead.id, `status_upgrade_to_${targetStatus}`, {
+        from: latestLead.status,
+        to: targetStatus,
+      });
+
+      return { lead: updatedLead, isNew: false, isUpgrade: true };
+    }
+
+    if (latestLead.status === 'vertrag_abgeschlossen') {
+      const newLeadData: any = {
+        email,
+        status: targetStatus,
+        source: 'rechner',
+      };
+
+      if (data?.vorname) newLeadData.vorname = data.vorname;
+      if (data?.nachname) newLeadData.nachname = data.nachname;
+      if (data?.anrede) { newLeadData.anrede = data.anrede; newLeadData.anrede_text = data.anrede; }
+      if (data?.telefon) newLeadData.telefon = data.telefon;
+      if (data?.care_start_timing) newLeadData.care_start_timing = data.care_start_timing;
+      if (data?.kalkulation) newLeadData.kalkulation = data.kalkulation;
+
+      if (targetStatus === 'angebot_requested') {
+        newLeadData.token = generateToken();
+        newLeadData.token_expires_at = getTokenExpiry().toISOString();
+        newLeadData.token_used = false;
+      }
+
+      const { data: newLead, error: insertError } = await supabase
+        .from('leads')
+        .insert(newLeadData)
+        .select()
+        .maybeSingle();
+
+      if (insertError) {
+        console.error('❌ Fehler beim Lead-Insert:', insertError);
+        throw new Error(`Lead konnte nicht erstellt werden: ${insertError.message}`);
+      }
+
+      if (!newLead) {
+        console.error('❌ Lead wurde nicht erstellt (null zurückgegeben)');
+        throw new Error('Lead konnte nicht erstellt werden: Keine Daten zurückgegeben');
+      }
+
+      await logEvent(newLead.id, targetStatus, {
+        message: 'Neuer Lead nach abgeschlossenem Vertrag',
+      });
+
+      return { lead: newLead, isNew: true, isUpgrade: false };
+    }
+  }
+
+  const newLeadData: any = {
+    email,
+    status: targetStatus,
+    source: 'rechner',
+  };
+
+  if (data?.vorname) newLeadData.vorname = data.vorname;
+  if (data?.nachname) newLeadData.nachname = data.nachname;
+  if (data?.anrede) { newLeadData.anrede = data.anrede; newLeadData.anrede_text = data.anrede; }
+  if (data?.telefon) newLeadData.telefon = data.telefon;
+  if (data?.care_start_timing) newLeadData.care_start_timing = data.care_start_timing;
+  if (data?.kalkulation) newLeadData.kalkulation = data.kalkulation;
+
+  if (targetStatus === 'angebot_requested') {
+    newLeadData.token = generateToken();
+    newLeadData.token_expires_at = getTokenExpiry().toISOString();
+    newLeadData.token_used = false;
+  }
+
+  const { data: newLead, error: insertError } = await supabase
+    .from('leads')
+    .insert(newLeadData)
+    .select()
+    .maybeSingle();
+
+  if (insertError) {
+    console.error('❌ Fehler beim Lead-Insert:', insertError);
+    throw new Error(`Lead konnte nicht erstellt werden: ${insertError.message}`);
+  }
+
+  if (!newLead) {
+    console.error('❌ Lead wurde nicht erstellt (null zurückgegeben)');
+    throw new Error('Lead konnte nicht erstellt werden: Keine Daten zurückgegeben');
+  }
+
+  await logEvent(newLead.id, targetStatus, { message: 'Neuer Lead erstellt' });
+
+  return { lead: newLead, isNew: true, isUpgrade: false };
+}
+
+export async function logEvent(
+  leadId: string,
+  eventType: string,
+  metadata?: any
+): Promise<void> {
+  await supabase.from('lead_events').insert({
+    lead_id: leadId,
+    event_type: eventType,
+    metadata: metadata || {},
+  });
+}
+
+export async function validateToken(token: string): Promise<{
+  valid: boolean;
+  lead?: Lead;
+  error?: string;
+}> {
+  const { data: lead } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('token', token)
+    .maybeSingle();
+
+  if (!lead) {
+    return { valid: false, error: 'Token nicht gefunden' };
+  }
+
+  if (lead.token_used) {
+    return { valid: false, error: 'Token bereits verwendet', lead };
+  }
+
+  if (lead.token_expires_at && new Date(lead.token_expires_at) < new Date()) {
+    return { valid: false, error: 'Token abgelaufen', lead };
+  }
+
+  await logEvent(lead.id, 'vertrag_link_opened', {});
+
+  return { valid: true, lead };
+}

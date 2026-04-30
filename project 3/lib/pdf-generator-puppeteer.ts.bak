@@ -1,0 +1,351 @@
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
+import { format, addDays } from 'date-fns';
+
+interface LeadData {
+  betreuungFuer: string;
+  pflegegrad: number;
+  mobilitaet: string;
+  nachteinsaetze: string;
+  deutschkenntnisse: string;
+  erfahrung: string;
+  vertragsLink?: string;
+}
+
+interface KalkulationData {
+  bruttopreis: number;
+  pflegegeld: number;
+  entlastungsbudgetMtl: number;
+  steuervorteil: number;
+  eigenanteil: number;
+}
+
+function formatEuro(amount: number): string {
+  return amount.toLocaleString('de-DE', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+function formatDate(date: Date): string {
+  return format(date, 'dd.MM.yyyy');
+}
+
+function generateHTML(lead: LeadData, kalkulation: KalkulationData): string {
+  const today = new Date();
+  const gueltigBis = addDays(today, 14);
+
+  return `
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #2C2C2C;
+      padding: 18mm 22mm 25mm 22mm;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2.5px solid #B5A184;
+      padding-bottom: 14px;
+      margin-bottom: 22px;
+    }
+
+    .logo {
+      width: 88px;
+      height: 38px;
+    }
+
+    .header-right {
+      font-size: 9pt;
+      color: #666;
+      text-align: right;
+      line-height: 1.4;
+    }
+
+    .page-title {
+      font-size: 18pt;
+      font-weight: bold;
+      color: #3D2B1F;
+      margin-bottom: 20px;
+    }
+
+    .section {
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 10pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #8C7A5E;
+      border-bottom: 1px solid #E8E0D6;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+    }
+
+    .angaben-grid {
+      background-color: #F5F0E8;
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+    }
+
+    .angaben-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10pt;
+    }
+
+    .angaben-label {
+      color: #666;
+    }
+
+    .angaben-value {
+      font-weight: bold;
+      color: #2C2C2C;
+    }
+
+    .kosten-block {
+      background-color: #FDFBF7;
+      border: 1px solid #E8E0D6;
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+
+    .kosten-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      font-size: 11pt;
+    }
+
+    .kosten-header-row {
+      font-size: 12pt;
+      font-weight: bold;
+      color: #3D2B1F;
+      padding-bottom: 10px;
+    }
+
+    .kosten-sub-header {
+      font-size: 10pt;
+      color: #999;
+      padding: 4px 0;
+    }
+
+    .kosten-sub-row {
+      padding-left: 16px;
+      font-size: 10pt;
+      color: #666;
+    }
+
+    .kosten-total {
+      font-size: 16pt;
+      font-weight: bold;
+      color: #2D6A4F;
+      border-top: 2.5px solid #B5A184;
+      margin-top: 10px;
+      padding-top: 14px;
+    }
+
+    .kosten-amount {
+      font-weight: bold;
+    }
+
+    .kosten-amount-negative {
+      font-weight: bold;
+      color: #2D6A4F;
+    }
+
+    .hinweis {
+      font-size: 9pt;
+      color: #999;
+      font-style: italic;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+
+    .footer {
+      position: fixed;
+      bottom: 14mm;
+      left: 22mm;
+      right: 22mm;
+      border-top: 1px solid #E8E0D6;
+      padding-top: 8px;
+      font-size: 8pt;
+      color: #999;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    @media print {
+      body {
+        margin: 0;
+        padding: 18mm 22mm 25mm 22mm;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <svg width="88" height="38" viewBox="0 0 88 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="88" height="38" rx="4" fill="#B5A184"/>
+        <text x="44" y="24" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle">PRIMUNDUS</text>
+      </svg>
+    </div>
+    <div class="header-right">
+      <div>Erstellt am: ${formatDate(today)}</div>
+      <div>Bestpreis-Garantie bis: ${formatDate(gueltigBis)}</div>
+    </div>
+  </div>
+
+  <h1 class="page-title">Ihre persönliche Kostenübersicht</h1>
+
+  <div class="section">
+    <div class="section-title">Ihre Angaben</div>
+    <div class="angaben-grid">
+      <div class="angaben-item">
+        <span class="angaben-label">Betreuung für</span>
+        <span class="angaben-value">${lead.betreuungFuer}</span>
+      </div>
+      <div class="angaben-item">
+        <span class="angaben-label">Pflegegrad</span>
+        <span class="angaben-value">${lead.pflegegrad}</span>
+      </div>
+      <div class="angaben-item">
+        <span class="angaben-label">Mobilität</span>
+        <span class="angaben-value">${lead.mobilitaet}</span>
+      </div>
+      <div class="angaben-item">
+        <span class="angaben-label">Nachteinsätze</span>
+        <span class="angaben-value">${lead.nachteinsaetze}</span>
+      </div>
+      <div class="angaben-item">
+        <span class="angaben-label">Deutschkenntnisse</span>
+        <span class="angaben-value">${lead.deutschkenntnisse}</span>
+      </div>
+      <div class="angaben-item">
+        <span class="angaben-label">Erfahrung</span>
+        <span class="angaben-value">${lead.erfahrung}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Kostenübersicht</div>
+    <div class="kosten-block">
+      <div class="kosten-row kosten-header-row">
+        <span>Monatlicher Bruttopreis</span>
+        <span class="kosten-amount">${formatEuro(kalkulation.bruttopreis)} €</span>
+      </div>
+      <div class="kosten-sub-header">
+        Direkt anrechenbare Zuschüsse:
+      </div>
+      <div class="kosten-row kosten-sub-row">
+        <span>Pflegegeld (Pflegegrad ${lead.pflegegrad})</span>
+        <span class="kosten-amount-negative">− ${formatEuro(kalkulation.pflegegeld)} €</span>
+      </div>
+      <div class="kosten-row kosten-sub-row">
+        <span>Entlastungsbudget (anteilig mtl.)</span>
+        <span class="kosten-amount-negative">− ${formatEuro(kalkulation.entlastungsbudgetMtl)} €</span>
+      </div>
+      <div class="kosten-row kosten-sub-row">
+        <span>Steuervorteil (§35a EStG)</span>
+        <span class="kosten-amount-negative">− ${formatEuro(kalkulation.steuervorteil)} €</span>
+      </div>
+      <div class="kosten-row kosten-total">
+        <span>Ihr monatlicher Eigenanteil</span>
+        <span class="kosten-amount">${formatEuro(kalkulation.eigenanteil)} €</span>
+      </div>
+    </div>
+    <div class="hinweis">
+      Zzgl. Kost & Logis für die Pflegekraft (Verpflegung und eigenes Zimmer, ca. 150–250 €/Monat).
+      An- und Abreisekosten sowie Feiertagszuschläge fallen nach Aufwand an.
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Primundus GmbH · www.primundus.de · Tel. 0800 123 456 78</span>
+    <span>Seite 1 von 1</span>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+export async function generateKalkulationPDF(
+  lead: LeadData,
+  kalkulation: KalkulationData
+): Promise<Buffer> {
+  let browser = null;
+
+  try {
+    console.log('[PDF] Starte Browser...');
+
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    const launchOptions = isProduction
+      ? {
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+        }
+      : {
+          headless: true,
+          executablePath: '/usr/bin/chromium',
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        };
+
+    browser = await puppeteer.launch(launchOptions);
+
+    console.log('[PDF] Browser gestartet, öffne Seite...');
+
+    const page = await browser.newPage();
+
+    const html = generateHTML(lead, kalkulation);
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    console.log('[PDF] Generiere PDF...');
+
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '0mm',
+        right: '0mm',
+        bottom: '0mm',
+        left: '0mm',
+      },
+    });
+
+    console.log('[PDF] PDF erfolgreich generiert');
+
+    return Buffer.from(pdf);
+  } catch (error) {
+    console.error('[PDF] Fehler bei PDF-Generierung:', error);
+    throw error;
+  } finally {
+    if (browser) {
+      console.log('[PDF] Schließe Browser...');
+      await browser.close();
+    }
+  }
+}

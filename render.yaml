@@ -1,15 +1,106 @@
+# Render Blueprint — beta deployments for both products in this repo.
+#
+# Spec: https://render.com/docs/blueprint-spec
+#
+# Two services share this monorepo:
+#
+#   1. caapp-beta            — Static Site (Vite + React)
+#                              built from repo root, serves the CA app
+#                              kundenportal at /. Public envs prefixed
+#                              VITE_* are baked at build time.
+#
+#   2. kostenrechner-beta    — Web Service (Next.js 13)
+#                              built from "project 3/" subdirectory.
+#                              SSR pages, magic-link mail, SMTP, calls
+#                              into Supabase Edge Functions.
+#                              Server-only secrets (SMTP_PASS, Supabase
+#                              service-role key) live as Render env-vars,
+#                              NOT in repo.
+#
+# Cross-link contract: kostenrechner-beta's NEXT_PUBLIC_PORTAL_URL points
+# at caapp-beta's URL, so the result-page handoff redirects there.
+#
+# After first deploy set the per-service secrets in the Render dashboard
+# (see docs/render-beta-deployment.md) — they're declared with sync:false
+# below so Render prompts for them rather than hard-coding from this file.
+
 services:
+  # ── 1. CA app (kundenportal) — Static Site ─────────────────────────────
   - type: web
-    name: kundenportal
+    name: caapp-beta
     runtime: static
-    buildCommand: npm run build
-    staticPublishPath: dist
+    plan: free
+    branch: integration/mamamia-onboarding
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    autoDeploy: true
+    pullRequestPreviewsEnabled: false
     envVars:
       - key: VITE_SUPABASE_URL
         value: https://ycdwtrklpoqprabtwahi.supabase.co
+      # Public anon key — same value already in the prior render.yaml,
+      # which is acceptable to commit (Supabase publishes it for browser
+      # consumption). Service role key never appears here.
       - key: VITE_SUPABASE_ANON_KEY
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZHd0cmtscG9xcHJhYnR3YWhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MjQwMTksImV4cCI6MjA4NzAwMDAxOX0.TN0T4yNwaZdF0BRpntVLQYvy6dr7KFqBjteNm8eKBvE
+      - key: VITE_DEBUG
+        value: "0"
     routes:
+      # SPA fallback so deep links like /?token=xxx hit index.html.
       - type: rewrite
         source: /*
         destination: /index.html
+
+  # ── 2. Primundus calculator (project 3) — Next.js Web Service ──────────
+  - type: web
+    name: kostenrechner-beta
+    runtime: node
+    plan: free
+    branch: integration/mamamia-onboarding
+    rootDir: project 3
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    pullRequestPreviewsEnabled: false
+    envVars:
+      # Public — baked into the client bundle; safe to commit-or-prompt.
+      # NEXT_PUBLIC_SITE_URL: once the service has its assigned URL, swap
+      # this to the actual https://kostenrechner-beta.onrender.com or a
+      # custom domain.
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      # NEXT_PUBLIC_PORTAL_URL: caapp-beta service URL. After first deploy
+      # set to e.g. https://caapp-beta.onrender.com — drives the handoff
+      # CTA in result page + Eingangsbestätigung email + PDF.
+      - key: NEXT_PUBLIC_PORTAL_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://ycdwtrklpoqprabtwahi.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InljZHd0cmtscG9xcHJhYnR3YWhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MjQwMTksImV4cCI6MjA4NzAwMDAxOX0.TN0T4yNwaZdF0BRpntVLQYvy6dr7KFqBjteNm8eKBvE
+
+      # Server-only secrets — declared sync:false so Render prompts on
+      # first deploy. Never read from any repo file.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.ionos.de
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Primundus 24h-Pflege
+      - key: SMTP_ADMIN_EMAIL
+        sync: false
+
+      # Node version pin — Next.js 13.5 needs ≥18; pinning 20 LTS for
+      # consistency with the CA app build.
+      - key: NODE_VERSION
+        value: "20"
