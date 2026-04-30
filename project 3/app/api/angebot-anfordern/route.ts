@@ -114,43 +114,46 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    // Fire-and-forget all email/scheduling side-effects — the customer's
+    // hand-off into CA app should NOT wait on Ionos SMTP (Render → Ionos
+    // can stall up to a minute when the relay rate-limits or blocks an
+    // unfamiliar source IP). Each promise still logs success/failure to
+    // lead_events so we can audit later. Render Web Services don't tear
+    // down on response, so the orphan promises continue running until
+    // the runtime decides they're done.
     const eingangsEmail = getEingangsbestaetigungEmailTemplate(lead, kalkulation);
-    const emailResult = await sendEmail(email, eingangsEmail);
+    sendEmail(email, eingangsEmail)
+      .then(async (r) => {
+        if (r.success) {
+          await logEvent(lead.id, 'email_eingangsbestaetigung_sent', { to: email, token: lead.token });
+        } else {
+          console.error('Eingangsbestaetigungs-Email fehlgeschlagen:', r.error);
+          await logEvent(lead.id, 'email_eingangsbestaetigung_failed', { to: email, error: r.error });
+        }
+      })
+      .catch((e) => console.error('eingangs send threw:', e instanceof Error ? e.message : String(e)));
 
-    if (emailResult.success) {
-      await logEvent(lead.id, 'email_eingangsbestaetigung_sent', {
-        to: email,
-        token: lead.token,
-      });
-    } else {
-      console.error('Eingangsbestaetigungs-Email fehlgeschlagen (Lead gespeichert):', emailResult.error);
-      await logEvent(lead.id, 'email_eingangsbestaetigung_failed', {
-        to: email,
-        error: emailResult.error,
-      });
-    }
-
-    const scheduleResult = await scheduleAngebotsEmail(lead.id, email);
-    const scheduleError = !scheduleResult.success;
-
-    if (!scheduleResult.success) {
-      console.error('Fehler beim Schedulen der Angebotsmail:', scheduleResult.error);
-      await logEvent(lead.id, 'email_angebot_schedule_failed', {
-        error: scheduleResult.error,
-      });
-    } else {
-      await logEvent(lead.id, 'email_angebot_scheduled', {
-        to: email,
-      });
-    }
+    scheduleAngebotsEmail(lead.id, email)
+      .then(async (r) => {
+        if (r.success) {
+          await logEvent(lead.id, 'email_angebot_scheduled', { to: email });
+        } else {
+          console.error('Fehler beim Schedulen der Angebotsmail:', r.error);
+          await logEvent(lead.id, 'email_angebot_schedule_failed', { error: r.error });
+        }
+      })
+      .catch((e) => console.error('scheduleAngebot threw:', e instanceof Error ? e.message : String(e)));
 
     const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested');
-    const teamEmailResult = await sendEmail('info@primundus.de', teamEmail);
-    if (teamEmailResult.success) {
-      await logEvent(lead.id, 'team_notified', { status: 'angebot_requested' });
-    } else {
-      console.error('Team-Benachrichtigung fehlgeschlagen:', teamEmailResult.error);
-    }
+    sendEmail('info@primundus.de', teamEmail)
+      .then(async (r) => {
+        if (r.success) {
+          await logEvent(lead.id, 'team_notified', { status: 'angebot_requested' });
+        } else {
+          console.error('Team-Benachrichtigung fehlgeschlagen:', r.error);
+        }
+      })
+      .catch((e) => console.error('team send threw:', e instanceof Error ? e.message : String(e)));
 
     // Response contract — used by the result page to drive the seamless
     // hand-off into the CA app (kundenportal). `token` is the persistent
@@ -176,8 +179,10 @@ export async function POST(request: NextRequest) {
       leadId: lead.id,
       isNew,
       isUpgrade,
-      emailSent: emailResult.success,
-      angebotsEmailScheduled: !scheduleError,
+      // emailSent / angebotsEmailScheduled are now best-effort — fired in
+      // the background, so the response can't reflect their outcome. The
+      // result page treats portalUrl as the only thing it actually needs.
+      emailDispatched: true,
       token: lead.token ?? null,
       portalUrl,
       message: 'Angebot angefordert',
