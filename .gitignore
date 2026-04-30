@@ -1,3 +1,12 @@
 node_modules
 dist
 .DS_Store
+supabase/.temp/
+.env
+.env.local
+.env.*.local
+.claude/
+coverage/
+# project 3 (Primundus calculator, Next.js) co-locates here so we can ship
+# it alongside the CA app from a single Render Blueprint. Its own
+# project 3/.gitignore keeps node_modules / .env / .next out of the repo.

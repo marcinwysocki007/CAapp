@@ -169,10 +169,15 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
   const mob = String(fd.mobilitaet ?? '');
   const nacht = String(fd.nachteinsaetze ?? '');
   const geschl = String(fd.geschlecht ?? '');
-  const weitere = String(fd.weitere_personen ?? '');
+  // anzahl = how many people need care (= Primundus "betreuung_fuer").
+  // NOT weitere_personen, which means "are there OTHER people IN the
+  // household who do NOT need care" (e.g. spouse who lives there).
+  // Pre-2026-04-28 we used the wrong key here — exact same bug we fixed
+  // in supabase/functions/onboard-to-mamamia/mappers.ts buildPatients.
+  const betreuungFuer = String(fd.betreuung_fuer ?? '');
 
   return {
-    anzahl:           weitere === 'ja' ? '2' : '1',
+    anzahl:           betreuungFuer === 'ehepaar' ? '2' : '1',
     pflegegrad:       fd.pflegegrad ? String(fd.pflegegrad) : undefined,
     mobilitaet:       mob ? (mobMap[mob] ?? '') : undefined,
     nacht:            nacht ? (nachtMap[nacht] ?? 'Nein') : undefined,
