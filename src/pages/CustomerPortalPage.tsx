@@ -854,6 +854,12 @@ const AngebotCard: FC<{
   const kundenEmail = lead?.email ?? 'graefinnorman@gmx.de';
   const kundenName = lead ? leadDisplayName(lead) : 'Frau Von Norman';
   const greeting = lead ? leadGreeting(lead) : 'Sehr geehrte Frau Von Norman';
+  const fd = kalk?.formularDaten;
+  const deutschMap: Record<string, string> = { grundlegend: 'Grundlegend', gut: 'Gut', fliessend: 'Fließend' };
+  const fuehrerscheinMap: Record<string, string> = { ja: 'Ja', nein: 'Nein', egal: 'Egal' };
+  const sprachniveauDisplay = fd?.deutschkenntnisse ? (deutschMap[String(fd.deutschkenntnisse)] ?? String(fd.deutschkenntnisse)) : 'mind. B1';
+  const fuehrerscheinDisplay = fd?.fuehrerschein ? (fuehrerscheinMap[String(fd.fuehrerschein)] ?? String(fd.fuehrerschein)) : 'Nicht erforderlich';
+
   const zuschüsse = kalk?.['zuschüsse']?.items?.filter(z => z.in_kalkulation) ?? [
     { label: 'Pflegegeld (Pflegegrad 2)', betrag_monatlich: 347 },
     { label: 'Entlastungsbudget (anteilig mt.)', betrag_monatlich: 295 },
@@ -1655,7 +1661,7 @@ const AngebotCard: FC<{
                           <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
                         </div>
                       )}
-                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">mind. B1</div>
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{sprachniveauDisplay}</div>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
@@ -1670,7 +1676,7 @@ const AngebotCard: FC<{
                           <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
                         </div>
                       )}
-                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">Nicht erforderlich</div>
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{fuehrerscheinDisplay}</div>
                     </div>
                   </div>
 
