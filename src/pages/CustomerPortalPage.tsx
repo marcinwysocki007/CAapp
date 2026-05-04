@@ -855,7 +855,7 @@ const AngebotCard: FC<{
   const kundenName = lead ? leadDisplayName(lead) : 'Frau Von Norman';
   const greeting = lead ? leadGreeting(lead) : 'Sehr geehrte Frau Von Norman';
   const fd = kalk?.formularDaten;
-  const deutschMap: Record<string, string> = { grundlegend: 'Grundlegend', gut: 'Gut', fliessend: 'Fließend' };
+  const deutschMap: Record<string, string> = { grundlegend: 'Grundlegend', kommunikativ: 'Kommunikativ', 'sehr-gut': 'Gut' };
   const fuehrerscheinMap: Record<string, string> = { ja: 'Ja', nein: 'Nein', egal: 'Egal' };
   const sprachniveauDisplay = fd?.deutschkenntnisse ? (deutschMap[String(fd.deutschkenntnisse)] ?? String(fd.deutschkenntnisse)) : 'mind. B1';
   const fuehrerscheinDisplay = fd?.fuehrerschein ? (fuehrerscheinMap[String(fd.fuehrerschein)] ?? String(fd.fuehrerschein)) : 'Nicht erforderlich';
