@@ -461,26 +461,14 @@ export function MultiStepForm() {
     }
   };
 
-  // Matching-Animation zwischen Step 10 und 11
-  if (showMatching) {
-    return (
-      <div id="calculator-form" className="pt-2 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-0 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4">
-        <MatchingAnimation
-          initialCount={displayCount}
-          onComplete={(finalCount) => {
-            setShowMatching(false);
-            setCurrentStep(10);
-            setMatchedCount(finalCount);
-          }}
-        />
-      </div>
-    );
-  }
-
   // Auto-redirect into the CA app once the success screen has rendered.
   // Visible 3-2-1 countdown so the page jump doesn't surprise the user;
   // manual click on the button (rendered below) skips the wait. Effect
   // is no-op when portalUrl is null (dev / NEXT_PUBLIC_PORTAL_URL unset).
+  // MUST be declared BEFORE any early returns (showMatching / showSuccess)
+  // — Rules of Hooks: every render path must call the same hooks in order.
+  // Without this, React error #300 fires the moment showMatching flips
+  // (one render runs the hook, the next early-returns past it).
   useEffect(() => {
     if (!showSuccess || !portalUrl) return;
     setRedirectCountdown(3);
@@ -497,6 +485,22 @@ export function MultiStepForm() {
     }, 1000);
     return () => clearInterval(interval);
   }, [showSuccess, portalUrl]);
+
+  // Matching-Animation zwischen Step 10 und 11
+  if (showMatching) {
+    return (
+      <div id="calculator-form" className="pt-2 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-0 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4">
+        <MatchingAnimation
+          initialCount={displayCount}
+          onComplete={(finalCount) => {
+            setShowMatching(false);
+            setCurrentStep(10);
+            setMatchedCount(finalCount);
+          }}
+        />
+      </div>
+    );
+  }
 
   // Success-Ansicht nach erfolgreichem Submit
   if (showSuccess) {
