@@ -257,24 +257,32 @@ export function getEingangsbestaetigungEmailTemplate(
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
 
-  const kalkulationData = kalkulation as any;
-  const aufschluesselung = kalkulationData?.aufschluesselung || [];
+  const fd = (kalkulation as any)?.formularDaten || {};
 
-  const getLabel = (kategorie: string) => {
-    const item = aufschluesselung.find((a: any) => a.kategorie === kategorie);
-    return item?.label || 'Nicht angegeben';
+  const LABELS: Record<string, Record<string, string>> = {
+    betreuung_fuer: { '1-person': '1 Person', 'ehepaar': '2 Personen' },
+    mobilitaet: { 'mobil': 'Mobil', 'rollator': 'Eingeschränkt – Rollator', 'rollstuhl': 'Rollstuhl', 'bettlaegerig': 'Bettlägerig' },
+    nachteinsaetze: { 'nein': 'Nein', 'gelegentlich': 'Gelegentlich', 'taeglich': 'Täglich (1×)', 'mehrmals': 'Mehrmals nachts' },
+    deutschkenntnisse: { 'grundlegend': 'Grundlegend', 'kommunikativ': 'Kommunikativ', 'sehr-gut': 'Gut' },
+    fuehrerschein: { 'ja': 'Ja', 'nein': 'Nein / nicht unbedingt' },
+    geschlecht: { 'egal': 'Egal', 'weiblich': 'Weiblich', 'maennlich': 'Männlich' },
+    erfahrung: { 'keine': 'Keine Anforderung', 'wuenschenswert': 'Wünschenswert', 'zwingend': 'Zwingend erforderlich' },
+    weitere_personen: { 'ja': 'Ja', 'nein': 'Nein' },
+    care_start_timing: { 'sofort': 'Sofort (4–7 Tage)', '2-4-wochen': 'In 2–4 Wochen', '1-2-monate': 'In 1–2 Monaten', 'unklar': 'Noch unklar' },
   };
 
-  const betreuungFuer = getLabel('betreuung_fuer');
-  const pflegegrad = aufschluesselung.find((a: any) => a.kategorie === 'pflegegrad')?.antwort || 'Nicht angegeben';
-  const weiterePersonen = getLabel('weitere_personen');
-  const mobilitaet = getLabel('mobilitaet');
-  const nachteinsaetze = getLabel('nachteinsaetze');
-  const deutschkenntnisse = getLabel('deutschkenntnisse');
-  const erfahrung = getLabel('erfahrung');
-  const fuehrerschein = getLabel('fuehrerschein');
-  const geschlecht = getLabel('geschlecht');
-  const careStartTiming = lead.care_start_timing || 'Nicht angegeben';
+  const lbl = (key: string, val: string) => LABELS[key]?.[val] || val || 'Nicht angegeben';
+
+  const betreuungFuer   = lbl('betreuung_fuer',    fd.betreuung_fuer);
+  const pflegegrad      = fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : 'Nicht angegeben';
+  const weiterePersonen = lbl('weitere_personen',  fd.weitere_personen);
+  const mobilitaet      = lbl('mobilitaet',        fd.mobilitaet);
+  const nachteinsaetze  = lbl('nachteinsaetze',    fd.nachteinsaetze);
+  const deutschkenntnisse = lbl('deutschkenntnisse', fd.deutschkenntnisse);
+  const erfahrung       = lbl('erfahrung',         fd.erfahrung);
+  const fuehrerschein   = lbl('fuehrerschein',     fd.fuehrerschein);
+  const geschlecht      = lbl('geschlecht',        fd.geschlecht);
+  const careStartTiming = lbl('care_start_timing', lead.care_start_timing || '');
 
   const detectedAnrede = lead.anrede_text || detectGenderFromName(lead.vorname || '');
   const eingangsNachname = lead.nachname || '';
@@ -291,70 +299,143 @@ export function getEingangsbestaetigungEmailTemplate(
     eingangsGreeting = 'Guten Tag';
   }
 
+  const ilkaSignatur = `
+    <!-- Ilka Signatur-Block -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
+      <tr>
+        <td style="padding: 18px 20px 16px; background: #ffffff;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="vertical-align: top;">
+                <table cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td style="padding-right: 12px; vertical-align: top;">
+                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                    </td>
+                    <td style="vertical-align: middle;">
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
+                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
+                      <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
+                    </td>
+                  </tr>
+                </table>
+                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
+                  <tr>
+                    <td style="padding-bottom: 6px;">
+                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+              <td style="vertical-align: top; text-align: right;">
+                <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
+                  <tr>
+                    <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
+                      <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
+                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
+                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background: #f9f6f2; border-top: 1px solid #e8ddd0;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
+                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Über 20 Jahre<br>Erfahrung</p>
+              </td>
+              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
+                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">60.000+<br>betreute Einsätze</p>
+              </td>
+              <td style="padding: 12px 0; text-align: center; width: 33%;">
+                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
   const content = `
-    <p style="font-size: 18px; line-height: 1.6; color: #333; margin-bottom: 25px;">${eingangsGreeting},</p>
+    <p style="font-size: 16px; line-height: 1.6; color: #333; margin-bottom: 20px;">${eingangsGreeting},</p>
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 25px;">vielen Dank für Ihre Anfrage zur 24h-Pflege. Wir haben Ihre Angaben erhalten und <strong>werden Ihnen schnellstmöglich ein persönliches Angebot</strong> zusenden.</p>
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 24px;">vielen Dank für Ihre Anfrage zur 24h-Pflege. Wir haben Ihre Angaben erhalten und werden Ihnen <strong>schnellstmöglich ein persönliches Angebot</strong> zusenden.</p>
 
-    <div style="background: #F5F0E8; border-radius: 8px; padding: 25px; margin: 30px 0; border-left: 4px solid #B5A184;">
-      <h3 style="color: #3D2B1F; font-size: 17px; font-weight: 600; margin: 0 0 20px 0;">Ihre Angaben im Überblick</h3>
-      <table style="width: 100%; border-collapse: collapse;">
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px; width: 45%;">Name:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'Nicht angegeben'}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">E-Mail:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${lead.email}</td>
-        </tr>
-        ${lead.telefon ? `
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Telefon:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${lead.telefon}</td>
-        </tr>
-        ` : ''}
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Betreuung für:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${betreuungFuer}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Weitere Personen:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${weiterePersonen}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Pflegegrad:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${pflegegrad}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Mobilität:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${mobilitaet}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Nachteinsätze:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${nachteinsaetze}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Deutschkenntnisse:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${deutschkenntnisse}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Erfahrung:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${erfahrung}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Führerschein:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${fuehrerschein}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #666; font-size: 14px;">Geschlecht:</td>
-          <td style="padding: 10px 0; border-bottom: 1px solid #E5E5E5; color: #333; font-size: 14px; font-weight: 600;">${geschlecht}</td>
-        </tr>
-        <tr>
-          <td style="padding: 10px 0; color: #666; font-size: 14px;">Wann soll die Betreuung starten?:</td>
-          <td style="padding: 10px 0; color: #333; font-size: 14px; font-weight: 600;">${careStartTiming}</td>
-        </tr>
-      </table>
-    </div>
+    <!-- Angaben-Tabelle -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 24px 0; border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden;">
+      <tr>
+        <td style="background: #f9f6f2; padding: 6px 20px; border-bottom: 1px solid #e8ddd0;">
+          <p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #9a8a73; text-transform: uppercase;">Ihre Angaben im Überblick</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 20px 8px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            ${[
+              ['Name', [lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'Nicht angegeben'],
+              ['E-Mail', lead.email],
+              lead.telefon ? ['Telefon', lead.telefon] : null,
+              ['Betreuung für', betreuungFuer],
+              ['Weitere Person im Haushalt', weiterePersonen],
+              ['Pflegegrad', pflegegrad],
+              ['Mobilität', mobilitaet],
+              ['Nachteinsätze', nachteinsaetze],
+              ['Deutschkenntnisse BK', deutschkenntnisse],
+              fd.fuehrerschein ? ['Führerschein BK', fuehrerschein] : null,
+              fd.geschlecht ? ['Geschlecht BK', geschlecht] : null,
+              ['Betreuungsstart', careStartTiming],
+            ].filter(Boolean).map((row, i, arr) => {
+              const [label, value] = row as [string, string];
+              const isLast = i === arr.length - 1;
+              return `<tr>
+                <td style="padding: 8px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #888; font-size: 13px; width: 44%;">${label}</td>
+                <td style="padding: 8px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #333; font-size: 13px; font-weight: 600;">${value}</td>
+              </tr>`;
+            }).join('')}
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Nächster Schritt -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 28px 0; border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden;">
+      <tr>
+        <td style="background: #f9f6f2; padding: 6px 20px; border-bottom: 1px solid #e8ddd0;">
+          <p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #9a8a73; text-transform: uppercase;">Nächster Schritt</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 18px 20px; text-align: left;">
+          <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #3D2B1F; line-height: 1.3;">Wir senden Ihnen Ihr persönliches Angebot</p>
+          <p style="margin: 0; font-size: 14px; color: #666; line-height: 1.6;">Unser Team prüft Ihre Angaben und meldet sich in Kürze – in der Regel noch am selben Werktag.</p>
+        </td>
+      </tr>
+    </table>
 
     ${(() => {
       // Magic-link section — embedded only when NEXT_PUBLIC_PORTAL_URL is
@@ -366,26 +447,16 @@ export function getEingangsbestaetigungEmailTemplate(
       if (!portalBase || !lead.token) return '';
       const portalUrl = `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
       return `
-    <div style="background: linear-gradient(135deg, #2D5C2F 0%, #1F4421 100%); border-radius: 10px; padding: 28px; margin: 35px 0 20px 0; text-align: center; color: #ffffff;">
+    <div style="background: linear-gradient(135deg, #2D5C2F 0%, #1F4421 100%); border-radius: 10px; padding: 28px; margin: 0 0 28px 0; text-align: center; color: #ffffff;">
       <h3 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 0 0 8px 0;">Ihr persönlicher Portal-Link</h3>
       <p style="color: #E8F5E9; font-size: 14px; line-height: 1.6; margin: 0 0 18px 0;">In Ihrem Kundenportal finden Sie passende Pflegekräfte und können direkt Kontakt aufnehmen. Der Link bleibt 14 Tage aktiv und kann jederzeit erneut verwendet werden.</p>
       <a href="${portalUrl}" style="display: inline-block; background: #ffffff; color: #2D5C2F; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">Pflegekraft jetzt finden →</a>
     </div>`;
     })()}
 
-    <div class="info-box" style="background-color: #E8F5E9; border-left: 4px solid #4CAF50; padding: 20px; margin: 25px 0; border-radius: 6px;">
-      <strong style="color: #2E7D32; font-size: 15px;">Wie geht es weiter?</strong>
-      <p style="color: #555; font-size: 15px; margin: 10px 0 0 0; line-height: 1.6;">Unser Team prüft Ihre Anfrage und meldet sich in Kürze mit einem passenden Angebot bei Ihnen.</p>
-    </div>
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px; text-align: left;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Ilka Wysocki</strong></p>
 
-    <div style="background: #F5F0E8; border-radius: 8px; padding: 20px; margin: 35px 0 20px 0; border-left: 4px solid #B5A184;">
-      <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">Bei Fragen stehen wir Ihnen gerne zur Verfügung:</p>
-      <p style="margin: 0; font-size: 20px; font-weight: 600; color: #6B5B45;">
-        +49 89 200 000 830
-      </p>
-    </div>
-
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-top: 30px;">Herzliche Grüße<br><strong style="color: #3D2B1F;">Ihr Primundus-Team</strong></p>
+    ${ilkaSignatur}
   `;
 
   const preheader = 'Ihre Anfrage ist eingegangen - Wir melden uns in Kürze';
@@ -418,21 +489,21 @@ Führerschein: ${fuehrerschein}
 Geschlecht: ${geschlecht}
 Wann soll die Betreuung starten?: ${careStartTiming}
 
+WIE GEHT ES WEITER?
+
+Unser Team prüft Ihre Anfrage und meldet sich in Kürze mit einem passenden Angebot bei Ihnen.
 ${(() => {
   const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
   if (!portalBase || !lead.token) return '';
   const portalUrl = `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
-  return `IHR PERSÖNLICHER PORTAL-LINK
+  return `
+IHR PERSÖNLICHER PORTAL-LINK
 
 In Ihrem Kundenportal finden Sie passende Pflegekräfte und können direkt Kontakt aufnehmen. Der Link bleibt 14 Tage aktiv und kann jederzeit erneut verwendet werden.
 
 ${portalUrl}
-
 `;
-})()}WIE GEHT ES WEITER?
-
-Unser Team prüft Ihre Anfrage und meldet sich in Kürze mit einem passenden Angebot bei Ihnen.
-
+})()}
 Bei Fragen stehen wir Ihnen gerne telefonisch zur Verfügung: +49 89 200 000 830
 
 Herzliche Grüße
@@ -448,8 +519,10 @@ www.primundus.de
 
 export function getAngebotsEmailTemplate(
   lead: Lead,
-  kalkulation: Kalkulation
+  kalkulation: Kalkulation,
+  options?: { isResend?: boolean }
 ): EmailTemplate {
+  const isResend = options?.isResend === true;
   const kalkulationUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/kalkulation/${lead.id}`;
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
 
@@ -474,45 +547,207 @@ export function getAngebotsEmailTemplate(
     anredeText = 'Guten Tag';
   }
 
-  const content = `
-    <p style="font-size: 18px; line-height: 1.6; color: #333; margin-bottom: 25px;">${anredeText},</p>
+  const introText = isResend
+    ? 'wie gewünscht senden wir Ihnen Ihr persönliches Angebot noch einmal zu.'
+    : 'vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr <strong>persönliches Angebot</strong> für die 24-Stunden-Betreuung zu Hause erstellt.';
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px;">vielen Dank für Ihre Anfrage.</p>
+  const resendNotice = isResend ? `
+    <div style="background-color: #f9f6f2; border: 1px solid #e8ddd0; border-radius: 6px; padding: 12px 16px; margin-top: 32px;">
+      <p style="margin: 0; font-size: 13px; color: #9a8a73; line-height: 1.5;">
+        ℹ️ Diese E-Mail wurde auf Ihre Bitte hin erneut zugesendet und enthält Ihr aktuelles persönliches Angebot.
+      </p>
+    </div>
+  ` : '';
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px;">Auf Grundlage Ihrer Angaben haben wir bereits ein <strong>persönliches Angebot</strong> für die Betreuung im eigenen Zuhause vorbereitet.</p>
+  const kalkulationAny = kalkulation as any;
+  const bruttopreis = kalkulationAny.bruttopreis || 0;
+  const tagessatz = bruttopreis ? Math.round(bruttopreis / 30).toLocaleString('de-DE') : null;
+  const zuschussItems: Array<{ label: string; betrag_monatlich: number }> =
+    (kalkulation.zuschüsse?.items || []).filter((z: any) => z.in_kalkulation && z.betrag_monatlich > 0);
+  const zuschussGesamt = zuschussItems.reduce((s, z) => s + z.betrag_monatlich, 0);
+  const zuschussGesamtFormatted = zuschussGesamt > 0 ? Math.round(zuschussGesamt).toLocaleString('de-DE') : null;
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px;">In dem Angebot finden Sie eine transparente Übersicht der monatlichen Kosten, mögliche Zuschüsse der Pflegekasse sowie alle wichtigen Informationen zum weiteren Ablauf.</p>
+  const priceBox = tagessatz ? `
+    <!-- Preisbox -->
+    <div style="border: 1px solid #e8ddd0; border-radius: 8px; background: #faf8f5; padding: 18px 20px; margin: 24px 0 20px 0;">
+      <p style="margin: 0 0 3px 0; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: #9a8a73; text-transform: uppercase;">Tagessatz</p>
+      <p style="margin: 0 0 6px 0; font-size: 30px; font-weight: 700; color: #3D2B1F; line-height: 1.1;">${tagessatz} €<span style="font-size: 16px; font-weight: 400; color: #888;">/Tag</span></p>
+      <p style="margin: 0; font-size: 13px; color: #888; line-height: 1.6;">inkl. Steuern &amp; Sozialabgaben, zzgl. Kost &amp; Logis sowie Fahrtkosten je 125 €</p>
+      ${zuschussGesamtFormatted ? `
+      <p style="margin: 14px 0 0 0; font-size: 13px; color: #555; line-height: 1.7; padding-top: 14px; border-top: 1px solid #e8ddd0;">
+        Mögliche Fördermittel bis zu <strong style="color: #5a8a4e;">${zuschussGesamtFormatted} €/Mon.</strong> – Weitere Details finden Sie im Angebot.
+      </p>` : ''}
+    </div>
 
-    <div style="margin: 35px 0; text-align: center;">
-      <a href="${kalkulationUrl}" style="display: inline-block; background: linear-gradient(135deg, #B5A184 0%, #9A8A73 100%); color: #ffffff; text-decoration: none; padding: 18px 40px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 15px rgba(181, 161, 132, 0.35);">
+    <!-- CTA Button -->
+    <div style="margin: 0 0 24px 0; text-align: center;">
+      <a href="${kalkulationUrl}" style="display: inline-block; background: linear-gradient(135deg, #B5A184 0%, #9A8A73 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 15px rgba(181, 161, 132, 0.35);">
         Angebot jetzt einsehen
       </a>
     </div>
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px;">Wenn alles für Sie passt, benötigen wir lediglich eine kurze Bestätigung von Ihnen. Dann starten wir direkt mit der Auswahl passender Betreuungskräfte und bereiten parallel alle organisatorischen und vertraglichen Modalitäten vor.</p>
+    <!-- Benefits – single column -->
+    <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: #9a8a73; text-transform: uppercase;">Ihre Vorteile nur bei Primundus</p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 28px 0;">
+      <tr><td style="padding: 4px 0; font-size: 13px; color: #5C4A32;">✓ Täglich kündbar</td></tr>
+      <tr><td style="padding: 4px 0; font-size: 13px; color: #5C4A32;">✓ Tagesgenaue Abrechnung</td></tr>
+      <tr><td style="padding: 4px 0; font-size: 13px; color: #5C4A32;">✓ Keine Kosten vor Anreise</td></tr>
+      <tr><td style="padding: 4px 0; font-size: 13px; color: #5C4A32;">✓ Persönlicher Ansprechpartner, 7&nbsp;Tage/Woche</td></tr>
+    </table>
+  ` : '';
 
-    <div class="info-box" style="background-color: #E8F5E9; border-left: 4px solid #4CAF50; padding: 20px; margin: 25px 0; border-radius: 6px;">
-      <p style="color: #555; font-size: 15px; margin: 0; line-height: 1.6;">Für Sie bleibt selbstverständlich alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.</p>
+  const content = `
+    <p style="font-size: 16px; line-height: 1.6; color: #333; margin-bottom: 20px;">${anredeText},</p>
+
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px;">${introText}</p>
+
+    ${priceBox}
+
+    <!-- Nächster Schritt -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 28px 0; border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden;">
+      <tr>
+        <td style="background: #f9f6f2; padding: 6px 20px 6px 20px; border-bottom: 1px solid #e8ddd0;">
+          <p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #9a8a73; text-transform: uppercase;">Nächster Schritt</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 18px 20px;">
+          <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #3D2B1F; line-height: 1.3;">Wir senden Ihnen passende Personalprofile</p>
+          <p style="margin: 0; font-size: 14px; color: #666; line-height: 1.6;">Geben Sie uns kurz Bescheid – per Telefon, WhatsApp oder einfach per Antwort auf diese E-Mail.</p>
+        </td>
+      </tr>
+    </table>
+
+    <div style="background-color: #f0f7ee; border-left: 4px solid #7aab6e; padding: 18px 20px; margin: 0 0 28px 0; border-radius: 0 6px 6px 0;">
+      <p style="color: #444; font-size: 15px; margin: 0; line-height: 1.6;">Für Sie bleibt selbstverständlich alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.</p>
     </div>
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-top: 30px;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Ilka Wysocki</strong></p>
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-top: 30px; margin-bottom: 20px;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Ilka Wysocki</strong></p>
+
+    <!-- Ilka Signatur-Block -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
+      <!-- Ilka + Testsieger -->
+      <tr>
+        <td style="padding: 18px 20px 16px; background: #ffffff;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <!-- Photo + Info + Buttons below -->
+              <td style="vertical-align: top;">
+                <!-- Photo + Name row -->
+                <table cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td style="padding-right: 12px; vertical-align: top;">
+                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60"
+                        style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                    </td>
+                    <td style="vertical-align: middle;">
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left; white-space: nowrap;">Ilka Wysocki</p>
+                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left; white-space: nowrap;">Pflegeberaterin</p>
+                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left; white-space: nowrap;">Mo – So, 8 – 20 Uhr</p>
+                    </td>
+                  </tr>
+                </table>
+                <!-- Buttons below photo/name -->
+                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
+                  <tr>
+                    <td style="padding-bottom: 6px;">
+                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+              <!-- Testsieger badge – rechts, kleiner -->
+              <td style="vertical-align: top; text-align: right;">
+                <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
+                  <tr>
+                    <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
+                      <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
+                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
+                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <!-- Stats row -->
+      <tr>
+        <td style="background: #f9f6f2; border-top: 1px solid #e8ddd0;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
+                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Über 20 Jahre<br>Erfahrung</p>
+              </td>
+              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
+                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">60.000+<br>betreute Einsätze</p>
+              </td>
+              <td style="padding: 12px 0; text-align: center; width: 33%;">
+                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <!-- Media logos – kleiner -->
+      <tr>
+        <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
+                <img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+              </td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
+                <img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+              </td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
+                <img src="${baseUrl}/images/media/ard.webp" alt="ARD" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+              </td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
+                <img src="${baseUrl}/images/media/ndr.webp" alt="NDR" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+              </td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
+                <img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+              </td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
+                <img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    ${resendNotice}
   `;
 
-  const preheader = 'Ihr persönliches Angebot zur 24-Stunden-Betreuung ist bereit';
+  const preheader = isResend
+    ? 'Ihr persönliches Angebot zur 24-Stunden-Betreuung – erneut zugesendet'
+    : 'Ihr persönliches Angebot zur 24-Stunden-Betreuung ist bereit';
 
   const html = getEmailLayout({ content, preheader, siteUrl: baseUrl }).replace('{{EMAIL}}', lead.email);
 
+  const subject = isResend
+    ? 'Ihr Angebot zur 24-Stunden-Betreuung (erneut zugesendet)'
+    : 'Ihr persönliches Angebot zur 24-Stunden-Betreuung';
+
   return {
-    subject: 'Ihr persönliches Angebot zur 24-Stunden-Betreuung',
+    subject,
     html,
     text: `
-Ihr persönliches Angebot zur 24-Stunden-Betreuung
+${subject}
 
 ${anredeText},
 
-vielen Dank für Ihre Anfrage.
+${isResend ? 'wie gewünscht senden wir Ihnen Ihr persönliches Angebot noch einmal zu.' : 'vielen Dank für Ihre Anfrage.'}
 
-Auf Grundlage Ihrer Angaben haben wir bereits ein persönliches Angebot für die Betreuung im eigenen Zuhause vorbereitet.
+Auf Grundlage Ihrer Angaben haben wir ein persönliches Angebot für die Betreuung im eigenen Zuhause vorbereitet.
 
 In dem Angebot finden Sie eine transparente Übersicht der monatlichen Kosten, mögliche Zuschüsse der Pflegekasse sowie alle wichtigen Informationen zum weiteren Ablauf.
 
@@ -791,6 +1026,209 @@ Lead im Admin-Panel: ${process.env.NEXT_PUBLIC_SITE_URL}/admin/leads/${lead.id}
   };
 }
 
+export function getVertragEmailTemplate(
+  lead: Lead,
+  options: {
+    subject?: string;
+    anschreiben?: string;
+    vertragsBeginn?: string;
+    vertragsDauer?: string;
+    tagessatz?: string;
+    agName?: string;
+    leName?: string;
+  } = {}
+): EmailTemplate {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
+  const anrede = lead.anrede_text || detectGenderFromName(lead.vorname || '');
+  const nachname = lead.nachname || '';
+  const vorname = lead.vorname || '';
+
+  let anredeText: string;
+  if (anrede === 'Frau' && nachname) anredeText = `Sehr geehrte Frau ${capitalize(nachname)}`;
+  else if (anrede === 'Herr' && nachname) anredeText = `Sehr geehrter Herr ${capitalize(nachname)}`;
+  else if (anrede === 'Familie' && nachname) anredeText = `Sehr geehrte Familie ${capitalize(nachname)}`;
+  else if (vorname && nachname) anredeText = `Guten Tag ${capitalize(vorname)} ${capitalize(nachname)}`;
+  else if (vorname) anredeText = `Guten Tag ${capitalize(vorname)}`;
+  else anredeText = 'Guten Tag';
+
+  const subject = options.subject || `Ihr Dienstleistungsvertrag – PRIMUNDUS Deutschland`;
+
+  const tagessatzDisplay = options.tagessatz && options.tagessatz !== '_______________' ? options.tagessatz : null;
+
+  const conditionsRows = [
+    { icon: '€', label: 'Tagessatz', value: tagessatzDisplay ? `${tagessatzDisplay}/Tag` : 'Gemäß Vertrag § 4' },
+    { icon: '🚗', label: 'Fahrtkosten', value: '125 € je Strecke (internationaler Transfer)' },
+    { icon: '🏠', label: 'Kost & Logis', value: 'Frei für die Betreuungsperson (Zimmer + Verpflegung)' },
+    { icon: '📅', label: 'Feiertage', value: 'Doppelter Tagessatz (§ 4.8)' },
+    { icon: '☀️', label: 'Sommermonate Juli & August', value: '+ 200 €/Monat Aufschlag (§ 4.9)' },
+  ];
+
+  const ilkaSignatur = `
+    <!-- Ilka Signatur-Block -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
+      <tr>
+        <td style="padding: 18px 20px 16px; background: #ffffff;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="vertical-align: top;">
+                <table cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td style="padding-right: 12px; vertical-align: top;">
+                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                    </td>
+                    <td style="vertical-align: middle;">
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
+                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
+                      <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
+                    </td>
+                  </tr>
+                </table>
+                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
+                  <tr>
+                    <td style="padding-bottom: 6px;">
+                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+              <td style="vertical-align: top; text-align: right;">
+                <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
+                  <tr>
+                    <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
+                      <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
+                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
+                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background: #f9f6f2; border-top: 1px solid #e8ddd0;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
+                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Über 20 Jahre<br>Erfahrung</p>
+              </td>
+              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
+                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">60.000+<br>betreute Einsätze</p>
+              </td>
+              <td style="padding: 12px 0; text-align: center; width: 33%;">
+                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
+
+  const detailRows = [
+    options.agName ? `<tr><td style="padding:6px 12px 6px 0;color:#888;white-space:nowrap;font-size:13px;">Auftraggeber</td><td style="padding:6px 0;font-weight:600;font-size:13px;">${options.agName}</td></tr>` : '',
+    options.leName ? `<tr><td style="padding:6px 12px 6px 0;color:#888;white-space:nowrap;font-size:13px;">Leistungsempfänger</td><td style="padding:6px 0;font-weight:600;font-size:13px;">${options.leName}</td></tr>` : '',
+    options.vertragsBeginn && options.vertragsBeginn !== '_______________' ? `<tr><td style="padding:6px 12px 6px 0;color:#888;white-space:nowrap;font-size:13px;">Vertragsbeginn</td><td style="padding:6px 0;font-weight:600;font-size:13px;">${options.vertragsBeginn}</td></tr>` : '',
+    options.vertragsDauer ? `<tr><td style="padding:6px 12px 6px 0;color:#888;white-space:nowrap;font-size:13px;">Vertragsdauer</td><td style="padding:6px 0;font-weight:600;font-size:13px;">${options.vertragsDauer}</td></tr>` : '',
+  ].filter(Boolean).join('');
+
+  const content = `
+    <p style="font-size: 16px; line-height: 1.6; color: #333; margin-bottom: 20px;">${anredeText},</p>
+
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 24px;">anbei erhalten Sie Ihren <strong>Dienstleistungsvertrag mit PRIMUNDUS Deutschland</strong>. Bitte prüfen Sie alle Angaben sorgfältig, unterzeichnen Sie den Vertrag und senden Sie uns ein Exemplar zurück – per E-Mail, Fax oder Post.</p>
+
+    ${detailRows ? `
+    <!-- Vertragsdetails -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 24px 0; border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden;">
+      <tr>
+        <td style="background: #f9f6f2; padding: 6px 20px; border-bottom: 1px solid #e8ddd0;">
+          <p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #9a8a73; text-transform: uppercase;">Ihre Vertragsdetails</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 20px 8px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            ${detailRows}
+          </table>
+        </td>
+      </tr>
+    </table>` : ''}
+
+    <!-- Konditionen -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 28px 0; border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden;">
+      <tr>
+        <td style="background: #f9f6f2; padding: 6px 20px; border-bottom: 1px solid #e8ddd0;">
+          <p style="margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #9a8a73; text-transform: uppercase;">Ihre Konditionen im Überblick</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 20px 8px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            ${conditionsRows.map((row, i, arr) => {
+              const isLast = i === arr.length - 1;
+              return `<tr>
+                <td style="padding: 9px 12px 9px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #888; font-size: 13px; width: 44%; white-space: nowrap;">${row.label}</td>
+                <td style="padding: 9px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #333; font-size: 13px; font-weight: 600;">${row.value}</td>
+              </tr>`;
+            }).join('')}
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <p style="font-size: 14px; line-height: 1.7; color: #888; margin-bottom: 28px;">Den vollständigen Vertrag finden Sie im Anhang dieser E-Mail. Bei Fragen stehen wir Ihnen jederzeit gerne zur Verfügung.</p>
+
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px; text-align: left;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Ilka Wysocki</strong></p>
+
+    ${ilkaSignatur}
+  `;
+
+  const preheader = 'Ihr Dienstleistungsvertrag mit PRIMUNDUS Deutschland – bitte lesen und unterschreiben';
+
+  const html = getEmailLayout({ content, preheader, siteUrl: baseUrl }).replace('{{EMAIL}}', lead.email);
+
+  const text = `${anredeText},
+
+anbei erhalten Sie Ihren Dienstleistungsvertrag mit PRIMUNDUS Deutschland.
+
+Ihre Konditionen:
+- Tagessatz: ${tagessatzDisplay ? `${tagessatzDisplay}/Tag` : 'Gemäß Vertrag § 4'}
+- Fahrtkosten: 125 € je Strecke
+- Kost & Logis: Frei (Zimmer + Verpflegung)
+- Feiertage: Doppelter Tagessatz (§ 4.8)
+- Juli & August: + 200 €/Monat Aufschlag (§ 4.9)
+${options.vertragsBeginn && options.vertragsBeginn !== '_______________' ? `\nVertragsbeginn: ${options.vertragsBeginn}` : ''}${options.vertragsDauer ? `\nVertragsdauer: ${options.vertragsDauer}` : ''}
+
+Den vollständigen Vertrag finden Sie im Anhang.
+
+Mit freundlichen Grüßen
+Ilka Wysocki · Pflegeberaterin
+
+PRIMUNDUS Deutschland · Telefon: 089 200 000 830 · info@primundus.de`;
+
+  return { subject, html, text };
+}
+
 export async function sendConfirmationEmail(data: {
   to: string;
   template: EmailTemplate;
@@ -799,8 +1237,12 @@ export async function sendConfirmationEmail(data: {
   return sendEmail(data.to, data.template, data.attachments);
 }
 
+// Email transport — kept on nodemailer/Ionos SMTP per user decision.
+// Signature accepts string | string[] so multi-recipient callers from
+// the cherry-picked content layer (e.g. Vertrag template) keep working;
+// nodemailer happily takes a comma-joined string in the `to` field.
 export async function sendEmail(
-  to: string,
+  to: string | string[],
   template: EmailTemplate,
   attachments?: any[]
 ): Promise<{ success: boolean; error?: string }> {
@@ -817,9 +1259,11 @@ export async function sendEmail(
       },
     });
 
+    const toAddr = Array.isArray(to) ? to.join(', ') : to;
+
     const mailOptions: any = {
       from: `"${process.env.SMTP_FROM_NAME || 'Primundus 24h-Pflege'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
-      to,
+      to: toAddr,
       subject: template.subject,
       text: template.text,
       html: template.html,
@@ -834,7 +1278,7 @@ export async function sendEmail(
     }
 
     await transporter.sendMail(mailOptions);
-    console.log(`Email sent via SMTP to: ${to}`);
+    console.log(`Email sent via SMTP to: ${toAddr}`);
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
