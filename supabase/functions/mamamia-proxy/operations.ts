@@ -54,8 +54,6 @@ export const GET_CUSTOMER = /* GraphQL */ `
       is_pet_cat
       is_pet_other
       day_care_facility
-      day_care_facility_description
-      day_care_facility_description_de
       patients {
         id
         gender
@@ -382,10 +380,6 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
     $smoking_household: String
     $internet: String
     $day_care_facility: String
-    $day_care_facility_description: String
-    $day_care_facility_description_de: String
-    $day_care_facility_description_en: String
-    $day_care_facility_description_pl: String
     $caregiver_time_off: String
     $pets: String
     $is_pet_dog: Boolean
@@ -412,10 +406,6 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
       smoking_household: $smoking_household
       internet: $internet
       day_care_facility: $day_care_facility
-      day_care_facility_description: $day_care_facility_description
-      day_care_facility_description_de: $day_care_facility_description_de
-      day_care_facility_description_en: $day_care_facility_description_en
-      day_care_facility_description_pl: $day_care_facility_description_pl
       caregiver_time_off: $caregiver_time_off
       pets: $pets
       is_pet_dog: $is_pet_dog

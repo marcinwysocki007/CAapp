@@ -371,13 +371,13 @@ export interface MappedCustomerPatch {
   // ── Newly mapped (post-2026-04-28 audit) ──
   urbanization_id?: number;
   day_care_facility?: 'yes' | 'no';
-  // Description string + 4 locales — Mamamia panel form requires this
-  // when day_care_facility=yes. Built from pflegedienstHaeufigkeit +
-  // pflegedienstAufgaben in AngebotCard.
-  day_care_facility_description?: string;
-  day_care_facility_description_de?: string;
-  day_care_facility_description_en?: string;
-  day_care_facility_description_pl?: string;
+  // Note: Mamamia GraphQL UpdateCustomer mutation does NOT accept
+  // day_care_facility_description{,_de,_en,_pl} as input arguments
+  // (verified 2026-05-05 via beta — adding them to the mutation triggered
+  // GraphQL parse failure, breaking ALL updateCustomer calls). The DB
+  // columns exist but the mutation input type doesn't expose them.
+  // Workaround: append the pflegedienst description to job_description
+  // — that field IS settable and carries free-text agency-readable info.
   pets?: string;
   is_pet_dog?: boolean;
   is_pet_cat?: boolean;
@@ -447,23 +447,10 @@ export function mapPatientFormToUpdateCustomerInput(
 
   const dcf = dayCareFacilityToApi(form.pflegedienst);
   if (dcf) patch.day_care_facility = dcf;
-  // When pflegedienst is active, Mamamia requires a description (frequency
-  // + tasks). AngebotCard renders the follow-up sub-form and we serialize
-  // it here. dcf='no' skips the description entirely (no field needed).
-  if (dcf === 'yes') {
-    const desc = buildDayCareFacilityDescription(
-      form.pflegedienstHaeufigkeit ?? '',
-      form.pflegedienstAufgaben ?? '',
-    );
-    if (desc) {
-      // Mamamia stores both an unscoped and DE-locale field; mirror the
-      // DE value into both so the agency UI shows it whichever it reads.
-      patch.day_care_facility_description = desc.de;
-      patch.day_care_facility_description_de = desc.de;
-      patch.day_care_facility_description_en = desc.en;
-      patch.day_care_facility_description_pl = desc.pl;
-    }
-  }
+  // pflegedienst description: serialize frequency + tasks and stash on
+  // `job_description` (the only writable free-text field on UpdateCustomer
+  // — the dedicated day_care_facility_description column is read-only via
+  // GraphQL). See `MappedCustomerPatch` comment for context.
 
   const petsObj = petsToApi(form.tiere);
   if (petsObj.pets) {
@@ -508,10 +495,26 @@ export function mapPatientFormToUpdateCustomerInput(
     patch.customer_caregiver_wish = wish;
   }
 
-  // ── job_description: ONLY medical diagnoses now ─────────────────────
+  // ── job_description: medical diagnoses + pflegedienst description ───
   // aufgaben/sonstigeWuensche moved out (they belong on the wish row).
+  // Pflegedienst frequency+tasks land here too because the dedicated
+  // day_care_facility_description column isn't writable via GraphQL
+  // UpdateCustomer (Mamamia mutation input doesn't expose it).
+  const jobParts: string[] = [];
   if (form.diagnosen) {
-    patch.job_description = `Diagnosen: ${form.diagnosen}`;
+    jobParts.push(`Diagnosen: ${form.diagnosen}`);
+  }
+  if (dcf === 'yes') {
+    const desc = buildDayCareFacilityDescription(
+      form.pflegedienstHaeufigkeit ?? '',
+      form.pflegedienstAufgaben ?? '',
+    );
+    if (desc) {
+      jobParts.push(`Pflegedienst: ${desc.de}`);
+    }
+  }
+  if (jobParts.length > 0) {
+    patch.job_description = jobParts.join(' | ');
   }
 
   return patch;

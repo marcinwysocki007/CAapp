@@ -477,36 +477,36 @@ describe('mapMamamiaCustomerToPatientForm — patientGenderKnown', () => {
   });
 });
 
-// ─── Bug #9 round-trip: day_care_facility_description → form ──────────────
-// AngebotCard ships frequency + tasks as "{frequency}: {task1, task2, ...}".
-// When the user re-opens the form, the reverse mapper splits on the first
-// colon to restore both controls.
+// ─── Bug #9 round-trip: pflegedienst from job_description → form ─────────
+// AngebotCard ships frequency + tasks via job_description as
+// "Pflegedienst: {frequency}: {task1, task2, ...}" (combined with other
+// segments like "Diagnosen: …" using " | "). When the user re-opens the
+// form, the reverse mapper isolates the Pflegedienst segment and splits
+// on the first inner colon to restore both controls.
 
-describe('mapMamamiaCustomerToPatientForm — day_care_facility_description', () => {
+describe('mapMamamiaCustomerToPatientForm — pflegedienst from job_description', () => {
   function makeCustWithDayCare(
     facility: 'yes' | 'no' | null,
-    desc: string | null,
+    jobDescription: string | null,
   ): MamamiaCustomer {
     return {
       id: 1, customer_id: 'x-1', status: 'active',
       first_name: null, last_name: null, email: null, phone: null,
       language_id: null, location_id: null, location_custom_text: null,
-      job_description: null, arrival_at: null, departure_at: null,
+      job_description: jobDescription, arrival_at: null, departure_at: null,
       care_budget: null, gender: null, year_of_birth: null,
       accommodation: null, caregiver_accommodated: null,
       other_people_in_house: null, has_family_near_by: null,
       smoking_household: null, internet: null, urbanization_id: null,
       pets: null, is_pet_dog: null, is_pet_cat: null, is_pet_other: null,
       day_care_facility: facility,
-      day_care_facility_description: null,
-      day_care_facility_description_de: desc,
       patients: [], customer_caregiver_wish: null, customer_contracts: [],
     } as unknown as MamamiaCustomer;
   }
 
-  it('day_care_facility=yes with "{freq}: {tasks}" → splits into both fields', () => {
+  it('day_care_facility=yes with "Pflegedienst: {freq}: {tasks}" → splits into both fields', () => {
     const r = mapMamamiaCustomerToPatientForm(
-      makeCustWithDayCare('yes', '2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung'),
+      makeCustWithDayCare('yes', 'Pflegedienst: 2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung'),
     );
     expect(r.pflegedienst).toBe('Ja');
     expect(r.pflegedienstHaeufigkeit).toBe('2× pro Woche');
@@ -515,25 +515,45 @@ describe('mapMamamiaCustomerToPatientForm — day_care_facility_description', ()
     );
   });
 
-  it('day_care_facility=no → no follow-up fields prefilled', () => {
-    // Even if the agency typed something into the description while
-    // facility=no (legacy data), don't prefill — confusing UX given the
-    // form's Pflegedienst dropdown will show "Nein".
+  it('isolates Pflegedienst segment from a multi-segment job_description', () => {
+    // job_description carries Diagnosen + Pflegedienst joined by " | ".
+    // Reverse mapper picks just the Pflegedienst part — Diagnosen lives
+    // on its own form field, fed by a different code path.
     const r = mapMamamiaCustomerToPatientForm(
-      makeCustWithDayCare('no', 'leftover description'),
+      makeCustWithDayCare(
+        'yes',
+        'Diagnosen: Diabetes Typ 2 | Pflegedienst: 1× pro Woche: Wundversorgung',
+      ),
+    );
+    expect(r.pflegedienstHaeufigkeit).toBe('1× pro Woche');
+    expect(r.pflegedienstAufgaben).toBe('Wundversorgung');
+  });
+
+  it('day_care_facility=no → no follow-up fields prefilled', () => {
+    // Even if the job_description carries a stale Pflegedienst segment
+    // while facility=no (legacy data), don't prefill — UX consistency.
+    const r = mapMamamiaCustomerToPatientForm(
+      makeCustWithDayCare('no', 'Pflegedienst: 1× pro Woche: Wundversorgung'),
     );
     expect(r.pflegedienst).toBe('Nein');
     expect(r.pflegedienstHaeufigkeit).toBeUndefined();
     expect(r.pflegedienstAufgaben).toBeUndefined();
   });
 
-  it('description with no colon → puts everything on Häufigkeit (free-text fallback)', () => {
-    // Agency might type a free-text frequency without colon. Better to
-    // surface it on the visible field than silently drop user data.
+  it('Pflegedienst segment with no inner colon → puts everything on Häufigkeit (free-text fallback)', () => {
     const r = mapMamamiaCustomerToPatientForm(
-      makeCustWithDayCare('yes', 'Mehrmals pro Woche'),
+      makeCustWithDayCare('yes', 'Pflegedienst: Mehrmals pro Woche'),
     );
     expect(r.pflegedienstHaeufigkeit).toBe('Mehrmals pro Woche');
+    expect(r.pflegedienstAufgaben).toBeUndefined();
+  });
+
+  it('job_description without Pflegedienst segment → no follow-up prefill', () => {
+    // Legacy customers might have job_description with only Diagnosen.
+    const r = mapMamamiaCustomerToPatientForm(
+      makeCustWithDayCare('yes', 'Diagnosen: Hypertonie'),
+    );
+    expect(r.pflegedienstHaeufigkeit).toBeUndefined();
     expect(r.pflegedienstAufgaben).toBeUndefined();
   });
 });

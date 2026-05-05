@@ -668,20 +668,25 @@ export function mapMamamiaCustomerToPatientForm(
   if (cust.day_care_facility === 'yes') out.pflegedienst = 'Ja';
   else if (cust.day_care_facility === 'no') out.pflegedienst = 'Nein';
 
-  // Re-parse the day_care_facility_description string we wrote in
-  // patientFormMapper.buildDayCareFacilityDescription. Format: "{frequency}: {tasks}".
-  // We tolerate either field empty (build can produce just "{frequency}" or
-  // just "{tasks}") so the parser accepts a single half too.
-  const desc = cust.day_care_facility_description_de ?? cust.day_care_facility_description ?? '';
-  if (desc && cust.day_care_facility === 'yes') {
-    const colonIdx = desc.indexOf(':');
-    if (colonIdx >= 0) {
-      out.pflegedienstHaeufigkeit = desc.slice(0, colonIdx).trim();
-      out.pflegedienstAufgaben = desc.slice(colonIdx + 1).trim();
-    } else {
-      // No colon — assume the agency typed a free-text frequency or tasks.
-      // Keep it on Häufigkeit so the user sees their data and can edit it.
-      out.pflegedienstHaeufigkeit = desc.trim();
+  // Pflegedienst frequency+tasks live on `job_description` (the writable
+  // free-text field), formatted as `Pflegedienst: {frequency}: {tasks}`.
+  // Other parts of job_description ("Diagnosen: …") are separated by ` | `.
+  // Pull out just the Pflegedienst segment and split on the first colon
+  // to restore frequency + tasks selectors.
+  if (cust.day_care_facility === 'yes' && cust.job_description) {
+    const segments = cust.job_description.split(' | ');
+    const pflegedienstSeg = segments.find(s => s.startsWith('Pflegedienst: '));
+    if (pflegedienstSeg) {
+      const inner = pflegedienstSeg.slice('Pflegedienst: '.length);
+      const colonIdx = inner.indexOf(':');
+      if (colonIdx >= 0) {
+        out.pflegedienstHaeufigkeit = inner.slice(0, colonIdx).trim();
+        out.pflegedienstAufgaben = inner.slice(colonIdx + 1).trim();
+      } else {
+        // No inner colon — frequency-only or tasks-only legacy entry. Surface
+        // on Häufigkeit so user data isn't lost.
+        out.pflegedienstHaeufigkeit = inner.trim();
+      }
     }
   }
 

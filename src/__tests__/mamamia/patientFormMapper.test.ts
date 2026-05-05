@@ -233,14 +233,16 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients?.[0].mobility_id).toBeUndefined();
   });
 
-  // ─── Bug #9: day_care_facility_description (frequency + tasks) ─────────
-  // Mamamia panel form requires day_care_facility_description (+ locales)
-  // when day_care_facility=yes. AngebotCard's follow-up sub-form populates
-  // pflegedienstHaeufigkeit + pflegedienstAufgaben; this mapper combines
-  // them into the description string with 4 locale variants.
+  // ─── Bug #9: pflegedienst description on job_description ──────────────
+  // Mamamia GraphQL UpdateCustomer doesn't expose
+  // day_care_facility_description as a writable input — verified live on
+  // beta 2026-05-05 by the deployed mutation failing with
+  // "Internal server error" upstream. Workaround: append the description
+  // to job_description as `Pflegedienst: {frequency}: {tasks}`, separated
+  // from other segments (Diagnosen, etc.) by ` | `.
 
-  describe('day_care_facility_description', () => {
-    it('pflegedienst=Ja with frequency + tasks → description in 4 locales', () => {
+  describe('pflegedienst description on job_description', () => {
+    it('pflegedienst=Ja with frequency + tasks → job_description has Pflegedienst segment (DE)', () => {
       // pflegedienstAufgaben uses '; ' as the internal separator so the
       // task labels (which contain commas inside parens like
       // "Grundpflege (Körperpflege, Anziehen)") can be split back
@@ -251,18 +253,11 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         pflegedienstAufgaben: 'Grundpflege (Körperpflege, Anziehen); Wundversorgung',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.day_care_facility_description).toBe(
-        '2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung',
+      expect(r.job_description).toBe(
+        'Pflegedienst: 2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung',
       );
-      expect(r.day_care_facility_description_de).toBe(
-        '2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung',
-      );
-      expect(r.day_care_facility_description_en).toBe(
-        'Twice a week: Basic care (personal hygiene, dressing), Wound care',
-      );
-      expect(r.day_care_facility_description_pl).toBe(
-        '2× w tygodniu: Pielęgnacja podstawowa (higiena, ubieranie), Opatrywanie ran',
-      );
+      // No dedicated description fields — they aren't writable on Mamamia.
+      expect((r as Record<string, unknown>).day_care_facility_description).toBeUndefined();
     });
 
     it('pflegedienst=Geplant treated like Ja (Mamamia has no third option)', () => {
@@ -272,52 +267,43 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         pflegedienstAufgaben: 'Medikamentengabe',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.day_care_facility_description_de).toBe('Täglich: Medikamentengabe');
-      expect(r.day_care_facility_description_en).toBe('Daily: Medication administration');
-      expect(r.day_care_facility_description_pl).toBe('Codziennie: Podawanie leków');
+      expect(r.job_description).toBe('Pflegedienst: Täglich: Medikamentengabe');
     });
 
-    it('pflegedienst=Nein → no description fields emitted', () => {
-      // Critical: don't ship a stale description string when the customer
-      // says "no Pflegedienst" — Mamamia would render the contradictory
-      // pair (day_care_facility=no + description='Täglich: …') in the panel.
+    it('diagnoses + pflegedienst combine in one job_description (separator " | ")', () => {
+      const r = mapPatientFormToUpdateCustomerInput(makeForm({
+        diagnosen: 'Diabetes Typ 2',
+        pflegedienst: 'Ja',
+        pflegedienstHaeufigkeit: '1× pro Woche',
+        pflegedienstAufgaben: 'Wundversorgung',
+      }));
+      expect(r.job_description).toBe(
+        'Diagnosen: Diabetes Typ 2 | Pflegedienst: 1× pro Woche: Wundversorgung',
+      );
+    });
+
+    it('pflegedienst=Nein → no Pflegedienst segment in job_description', () => {
+      // Stale frequency/tasks must not leak through when customer says No.
       const r = mapPatientFormToUpdateCustomerInput(makeForm({
         pflegedienst: 'Nein',
         pflegedienstHaeufigkeit: 'Täglich', // stale leftover
         pflegedienstAufgaben: 'Medikamentengabe',
       }));
       expect(r.day_care_facility).toBe('no');
-      expect(r.day_care_facility_description).toBeUndefined();
-      expect(r.day_care_facility_description_de).toBeUndefined();
-      expect(r.day_care_facility_description_en).toBeUndefined();
-      expect(r.day_care_facility_description_pl).toBeUndefined();
+      expect(r.job_description).toBeUndefined();
     });
 
-    it('pflegedienst=Ja with empty follow-ups → no description (mapper tolerates partial)', () => {
+    it('pflegedienst=Ja with empty follow-ups → no description block (mapper tolerates partial)', () => {
       // Validation in AngebotCard prevents save when follow-ups are blank,
-      // but this is a defense-in-depth: if a malformed body slips through,
-      // we don't ship "yes" + literal "" — we just omit the description.
+      // but this is a defense-in-depth: don't ship a literal `Pflegedienst: `
+      // segment with empty body if a malformed body slips through.
       const r = mapPatientFormToUpdateCustomerInput(makeForm({
         pflegedienst: 'Ja',
         pflegedienstHaeufigkeit: '',
         pflegedienstAufgaben: '',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.day_care_facility_description).toBeUndefined();
-    });
-
-    it('unknown task label passes through verbatim in EN/PL (graceful degrade)', () => {
-      // If the AngebotCard checkbox set is extended without updating the
-      // translation tables, we still ship something readable — the agency
-      // sees the German label in all locales rather than dropped data.
-      const r = mapPatientFormToUpdateCustomerInput(makeForm({
-        pflegedienst: 'Ja',
-        pflegedienstHaeufigkeit: '1× pro Woche',
-        pflegedienstAufgaben: 'Spritzen vorbereiten', // not in dictionary
-      }));
-      expect(r.day_care_facility_description_de).toBe('1× pro Woche: Spritzen vorbereiten');
-      expect(r.day_care_facility_description_en).toBe('Once a week: Spritzen vorbereiten');
-      expect(r.day_care_facility_description_pl).toBe('1× w tygodniu: Spritzen vorbereiten');
+      expect(r.job_description).toBeUndefined();
     });
   });
 });

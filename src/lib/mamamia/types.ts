@@ -96,8 +96,9 @@ export interface MamamiaCustomer {
   is_pet_cat?: boolean | null;
   is_pet_other?: boolean | null;
   day_care_facility?: string | null;
-  day_care_facility_description?: string | null;
-  day_care_facility_description_de?: string | null;
+  // Note: day_care_facility_description{,_de,_en,_pl} columns exist in
+  // Mamamia DB but are NOT exposed via UpdateCustomer GraphQL mutation
+  // input. Pflegedienst frequency+tasks ride on `job_description` instead.
   /** Patients — full shape for prefill, not just { id }. */
   patients?: MamamiaPatient[];
   customer_caregiver_wish?: MamamiaCaregiverWish | null;
