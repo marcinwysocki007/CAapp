@@ -49,6 +49,15 @@ export interface Lead {
   token_used: boolean;
   care_start_timing: string | null;
   kalkulation: LeadKalkulation | null;
+  // Stage-B identity for the actual care recipient (only populated after
+  // /betreuung-beauftragen flow). Stage-A leads (Marcin's NEW calculator)
+  // leave them null and inherit lead.* via the onboard mapper fallback.
+  patient_anrede?: string | null;
+  patient_vorname?: string | null;
+  patient_nachname?: string | null;
+  patient_street?: string | null;
+  patient_zip?: string | null;
+  patient_city?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -114,13 +123,19 @@ export function leadGreeting(lead: Lead): string {
   return 'Guten Tag';
 }
 
-/** Map care_start_timing to a human-readable label */
+/** Map care_start_timing to a human-readable label.
+ *  Marcin's NEW calculator emits: sofort | 2-4-wochen | 1-2-monate | unklar.
+ *  Legacy values (1-2-wochen / 1-monat / spaeter) kept for backward compat
+ *  with old leads still in the DB. */
 export function careStartLabel(timing: string | null): string {
   const map: Record<string, string> = {
     sofort: 'ab sofort',
     '1-2-wochen': 'in 1–2 Wochen',
+    '2-4-wochen': 'in 2–4 Wochen',
     '1-monat': 'in ca. 1 Monat',
+    '1-2-monate': 'in 1–2 Monaten',
     spaeter: 'zu einem späteren Zeitpunkt',
+    unklar: 'noch unklar',
   };
   return timing ? (map[timing] ?? timing) : 'ab sofort';
 }
@@ -137,6 +152,12 @@ export interface PatientPrefill {
   pflegegrad?: string;
   mobilitaet?: string;
   nacht?: string;
+  // Person 2 carries the SAME calculator answers as Person 1 — the
+  // calculator collects one set for the couple as a unit. Set only when
+  // betreuung_fuer === 'ehepaar' so single-patient leads stay clean.
+  p2_pflegegrad?: string;
+  p2_mobilitaet?: string;
+  p2_nacht?: string;
   wunschGeschlecht?: string;
 }
 
@@ -144,19 +165,31 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
   const fd = lead.kalkulation?.formularDaten;
   if (!fd) return {};
 
-  // Mobilitaet mapping
+  // Mobilitaet mapping. Marcin's NEW calculator emits one of:
+  //   mobil | rollator | rollstuhl | bettlaegerig
+  // (legacy values gehfaehig / gehstock kept for old leads).
   const mobMap: Record<string, string> = {
-    rollstuhl:     'Rollstuhlfähig',
-    gehfaehig:     'Gehfähig mit Hilfe',
-    bettlaegerig:  'Bettlägerig',
     mobil:         'Selbstständig mobil',
+    rollator:      'Rollatorfähig',
+    rollstuhl:     'Rollstuhlfähig',
+    bettlaegerig:  'Bettlägerig',
+    // Legacy aliases — kept for leads created before the calculator
+    // copy was reworked. Should never appear in fresh leads.
+    gehstock:      'Am Gehstock',
+    gehfaehig:     'Gehfähig mit Hilfe',
   };
 
-  // Nachteinsätze mapping
+  // Nachteinsätze mapping. Marcin's NEW calculator emits:
+  //   nein | gelegentlich | taeglich | mehrmals
+  // Pre-2026-05-01 this map only had {nein, gelegentlich, regelmaessig},
+  // so a customer answering "Mehrmals nachts" silently fell through to
+  // 'Nein' in the patient-form prefill — confusing handoff.
   const nachtMap: Record<string, string> = {
     nein:          'Nein',
     gelegentlich:  'Gelegentlich',
-    regelmaessig:  'Regelmäßig',
+    taeglich:      'Bis zu 1 Mal',
+    mehrmals:      'Mehr als 2',
+    regelmaessig:  'Bis zu 1 Mal', // legacy alias
   };
 
   // Wunschgeschlecht mapping
@@ -175,12 +208,25 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
   // Pre-2026-04-28 we used the wrong key here — exact same bug we fixed
   // in supabase/functions/onboard-to-mamamia/mappers.ts buildPatients.
   const betreuungFuer = String(fd.betreuung_fuer ?? '');
+  const isCouple = betreuungFuer === 'ehepaar';
+
+  // Resolved labels — computed once, reused for Person 1 + 2.
+  const pflegegradLabel = fd.pflegegrad ? String(fd.pflegegrad) : undefined;
+  const mobilitaetLabel = mob ? (mobMap[mob] ?? '') : undefined;
+  const nachtLabel = nacht ? (nachtMap[nacht] ?? 'Nein') : undefined;
 
   return {
-    anzahl:           betreuungFuer === 'ehepaar' ? '2' : '1',
-    pflegegrad:       fd.pflegegrad ? String(fd.pflegegrad) : undefined,
-    mobilitaet:       mob ? (mobMap[mob] ?? '') : undefined,
-    nacht:            nacht ? (nachtMap[nacht] ?? 'Nein') : undefined,
+    anzahl:           isCouple ? '2' : '1',
+    pflegegrad:       pflegegradLabel,
+    mobilitaet:       mobilitaetLabel,
+    nacht:            nachtLabel,
+    // Person 2 inherits Person 1's calculator answers — the calculator
+    // doesn't collect them separately, and "couple, both have same
+    // Pflegegrad" is a much better default than blank/Pflegegrad 2.
+    // User edits Person 2 row in the patient form when reality differs.
+    p2_pflegegrad:    isCouple ? pflegegradLabel : undefined,
+    p2_mobilitaet:    isCouple ? mobilitaetLabel : undefined,
+    p2_nacht:         isCouple ? nachtLabel : undefined,
     wunschGeschlecht: geschl ? (geschlechtMap[geschl] ?? '') : undefined,
   };
 }

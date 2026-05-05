@@ -4,8 +4,9 @@ import {
   formatMamamiaDate,
   jobOfferArrivalDisplay,
   customerDisplayName,
+  mapMamamiaCustomerToPatientForm,
 } from '../../lib/mamamia/mappers';
-import type { MamamiaCaregiverRef } from '../../lib/mamamia/types';
+import type { MamamiaCaregiverRef, MamamiaCustomer } from '../../lib/mamamia/types';
 
 const NOW_ISO = '2026-04-24T12:00:00.000Z';
 const NOW_YEAR = 2026;
@@ -408,5 +409,70 @@ describe('customerDisplayName', () => {
 
   it('null customer → null', () => {
     expect(customerDisplayName(null)).toBe(null);
+  });
+});
+
+describe('mapMamamiaCustomerToPatientForm — patientGenderKnown', () => {
+  // Marcin's NEW calculator never asks for the patient's salutation, so
+  // every stage-A onboard hits the `resolvePatientGender` fallback in
+  // the onboard mapper which defaults to "female". When the lead later
+  // opens the portal, that meaningless default would prefill "Weiblich"
+  // in the patient-form Geschlecht dropdown — confusing the customer
+  // who expects an empty state until they pick. The new
+  // `patientGenderKnown` flag tells the mapper to omit gender prefill
+  // so AngebotCard renders the dropdown empty.
+  function makeCustWithGender(g: 'female' | 'male'): MamamiaCustomer {
+    return {
+      id: 1, customer_id: 'x-1', status: 'active',
+      first_name: null, last_name: null, email: null, phone: null,
+      language_id: null, location_id: null, location_custom_text: null,
+      job_description: null, arrival_at: null, departure_at: null,
+      care_budget: null, gender: null, year_of_birth: null,
+      accommodation: null, caregiver_accommodated: null,
+      other_people_in_house: null, has_family_near_by: null,
+      smoking_household: null, internet: null, urbanization_id: null,
+      pets: null, is_pet_dog: null, is_pet_cat: null, is_pet_other: null,
+      day_care_facility: null,
+      patients: [{ id: 11, gender: g, year_of_birth: null, care_level: 3,
+        mobility_id: null, weight: null, height: null, night_operations: null,
+        dementia: null, dementia_description: null, incontinence: null,
+        incontinence_feces: null, incontinence_urine: null, smoking: null,
+        lift_id: null }],
+      customer_caregiver_wish: null, customer_contracts: [],
+    } as unknown as MamamiaCustomer;
+  }
+
+  it('default (no opts) → emits geschlecht for backwards compat', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithGender('female'));
+    expect(r.geschlecht).toBe('Weiblich');
+  });
+
+  it('patientGenderKnown=true → emits geschlecht', () => {
+    const r = mapMamamiaCustomerToPatientForm(
+      makeCustWithGender('female'),
+      { patientGenderKnown: true },
+    );
+    expect(r.geschlecht).toBe('Weiblich');
+  });
+
+  it('patientGenderKnown=false → omits geschlecht (empty string)', () => {
+    const r = mapMamamiaCustomerToPatientForm(
+      makeCustWithGender('female'),
+      { patientGenderKnown: false },
+    );
+    expect(r.geschlecht).toBe('');
+  });
+
+  it('patientGenderKnown=false also clears p2_geschlecht', () => {
+    const cust = makeCustWithGender('female');
+    cust.patients = [
+      cust.patients![0],
+      { ...cust.patients![0], id: 12, gender: 'male' },
+    ];
+    const r = mapMamamiaCustomerToPatientForm(cust, { patientGenderKnown: false });
+    expect(r.geschlecht).toBe('');
+    expect(r.p2_geschlecht).toBe('');
+    // Other p2_* fields still propagate (Pflegegrad, mobility, etc.).
+    expect(r.p2_pflegegrad).toBe('Pflegegrad 3');
   });
 });

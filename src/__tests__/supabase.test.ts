@@ -127,7 +127,13 @@ describe('leadGreeting', () => {
 
 describe('careStartLabel', () => {
   it.each([
+    // NEW calculator (Marcin) emits these — they bled through as raw
+    // 'unklar' / '1-2-monate' before 2026-05-01.
     ['sofort', 'ab sofort'],
+    ['2-4-wochen', 'in 2–4 Wochen'],
+    ['1-2-monate', 'in 1–2 Monaten'],
+    ['unklar', 'noch unklar'],
+    // Legacy values from old calculator versions, kept for back-compat.
     ['1-2-wochen', 'in 1–2 Wochen'],
     ['1-monat', 'in ca. 1 Monat'],
     ['spaeter', 'zu einem späteren Zeitpunkt'],
@@ -173,6 +179,44 @@ describe('prefillPatientFromLead', () => {
     expect(prefillPatientFromLead(lead).anzahl).toBe('2');
   });
 
+  it("ehepaar — Person 2 inherits Person 1's pflegegrad / mobilitaet / nacht", () => {
+    // Calculator collects ONE set of answers for the couple as a unit.
+    // Pre-2026-05-01 we only filled p1; p2 fields stayed undefined and
+    // AngebotCard fell back to defaults (Pflegegrad 2, Selbstständig
+    // mobil, Nein) — silent overwrite of the user's actual answers.
+    const lead = {
+      ...baseLead,
+      kalkulation: {
+        ...baseLead.kalkulation!,
+        formularDaten: {
+          ...baseLead.kalkulation!.formularDaten!,
+          betreuung_fuer: 'ehepaar',
+          pflegegrad: 4,
+          mobilitaet: 'rollstuhl',
+          nachteinsaetze: 'mehrmals',
+        },
+      },
+    };
+    const r = prefillPatientFromLead(lead);
+    expect(r.anzahl).toBe('2');
+    expect(r.pflegegrad).toBe('4');
+    expect(r.mobilitaet).toBe('Rollstuhlfähig');
+    expect(r.nacht).toBe('Mehr als 2');
+    expect(r.p2_pflegegrad).toBe('4');
+    expect(r.p2_mobilitaet).toBe('Rollstuhlfähig');
+    expect(r.p2_nacht).toBe('Mehr als 2');
+  });
+
+  it('single patient — does NOT emit p2_* fields', () => {
+    // Don't pollute the form prefill with p2_* keys when anzahl=1; keeps
+    // localStorage drafts clean.
+    const r = prefillPatientFromLead(baseLead);
+    expect(r.anzahl).toBe('1');
+    expect(r.p2_pflegegrad).toBeUndefined();
+    expect(r.p2_mobilitaet).toBeUndefined();
+    expect(r.p2_nacht).toBeUndefined();
+  });
+
   it("ignores weitere_personen='ja' for anzahl (different semantic)", () => {
     // weitere_personen = "are there OTHER people in the household".
     // Only betreuung_fuer drives patient count.
@@ -192,9 +236,11 @@ describe('prefillPatientFromLead', () => {
 
   it.each([
     ['mobil', 'Selbstständig mobil'],
-    ['gehfaehig', 'Gehfähig mit Hilfe'],
+    ['rollator', 'Rollatorfähig'],         // NEW calculator
     ['rollstuhl', 'Rollstuhlfähig'],
     ['bettlaegerig', 'Bettlägerig'],
+    ['gehstock', 'Am Gehstock'],           // legacy alias
+    ['gehfaehig', 'Gehfähig mit Hilfe'],   // legacy alias
   ])('maps mobilitaet=%s → %s', (input, expected) => {
     const lead = {
       ...baseLead,
@@ -209,7 +255,13 @@ describe('prefillPatientFromLead', () => {
   it.each([
     ['nein', 'Nein'],
     ['gelegentlich', 'Gelegentlich'],
-    ['regelmaessig', 'Regelmäßig'],
+    // NEW calculator (Marcin) emits taeglich + mehrmals — pre-2026-05-01
+    // both fell through to default 'Nein'. Now map to the patient-form
+    // labels the AngebotCard <CustomSelect> options expect.
+    ['taeglich', 'Bis zu 1 Mal'],
+    ['mehrmals', 'Mehr als 2'],
+    // legacy alias from old calculator
+    ['regelmaessig', 'Bis zu 1 Mal'],
   ])('maps nachteinsaetze=%s → %s', (input, expected) => {
     const lead = {
       ...baseLead,

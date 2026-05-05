@@ -601,9 +601,20 @@ function mamamiaPatientToForm(
 
 export function mapMamamiaCustomerToPatientForm(
   cust: MamamiaCustomer | null,
+  opts: {
+    /** When false, omit `geschlecht` / `p2_geschlecht` from the output —
+     *  the onboard mapper defaults patient.gender to "female" when the
+     *  lead has no salutation (Marcin's NEW calculator never asks for
+     *  `anrede` of the patient), and that default is meaningless to the
+     *  customer. AngebotCard then leaves the dropdown empty so the user
+     *  consciously picks a value. Defaults to `true` for backwards
+     *  compat. */
+    patientGenderKnown?: boolean;
+  } = {},
 ): PatientFormPrefill {
   if (!cust) return {};
   const out: PatientFormPrefill = {};
+  const genderKnown = opts.patientGenderKnown !== false;
 
   // anzahl from patients.length (1 or 2). 0/missing → leave undefined so
   // the formularDaten prefill or default '1' wins.
@@ -612,12 +623,14 @@ export function mapMamamiaCustomerToPatientForm(
 
   // Patient 1
   if (patients[0]) {
-    Object.assign(out, mamamiaPatientToForm(patients[0]));
+    const p1 = mamamiaPatientToForm(patients[0]);
+    Object.assign(out, p1);
+    if (!genderKnown) out.geschlecht = '';
   }
   // Patient 2 — same fields, p2_* keys.
   if (patients[1]) {
     const p2 = mamamiaPatientToForm(patients[1]);
-    out.p2_geschlecht = p2.geschlecht;
+    out.p2_geschlecht = genderKnown ? p2.geschlecht : '';
     out.p2_geburtsjahr = p2.geburtsjahr;
     out.p2_pflegegrad = p2.pflegegrad;
     out.p2_gewicht = p2.gewicht;

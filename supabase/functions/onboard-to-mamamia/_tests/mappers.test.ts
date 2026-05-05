@@ -177,10 +177,13 @@ Deno.test("mapNightOperations: taeglich (Primundus '1×') → 'up_to_1_time'", (
   );
 });
 
-Deno.test("mapNightOperations: mehrmals (Primundus 'multiple times') → '1_2_times'", () => {
+Deno.test("mapNightOperations: mehrmals (Primundus 'Mehrmals nachts') → 'more_than_2'", () => {
+  // Pre-2026-05-01 we mapped this to "1_2_times" — but "Mehrmals nachts"
+  // in Marcin's NEW calculator means MORE than 2× per night, not 1-2.
+  // Customer answering this honestly was being silently downgraded.
   assertEquals(
     mapNightOperations(makeFormularDaten({ nachteinsaetze: "mehrmals" })),
-    "1_2_times",
+    "more_than_2",
   );
 });
 
@@ -356,14 +359,20 @@ Deno.test("buildPatients: betreuung_fuer='ehepaar' → 2 patients (couple under 
   // weitere_personen which is a different question (others IN house).
   const patients = buildPatients(makeFormularDaten({ betreuung_fuer: "ehepaar" }));
   assertEquals(patients.length, 2);
-  // first patient filled from formular
+  // first patient filled from formular (rollstuhl in fixture)
   assertEquals(patients[0].mobility_id, 4);
-  // second patient — required fields all set (Mamamia rejects partial patient
-  // shapes inside the same StoreCustomer call)
-  assertEquals(patients[1].mobility_id, 1);
-  assertEquals(patients[1].care_level, 2);
-  assertEquals(patients[1].lift_id, 2);  // mobile → no lift
-  assertEquals(patients[1].tool_ids, [1]); // mobile → Walking stick only (never Others)
+  // 2nd patient inherits Person 1's care attributes (Pflegegrad,
+  // mobility, lift, night_ops). Pre-2026-05-01 we hardcoded these to
+  // {care_level:2, mobility:1, lift:2, night:"no"} — silent overwrite of
+  // user input. Couple gets ONE set of answers from the calculator and
+  // both rows should reflect them by default; user edits Person 2 in
+  // the patient form when reality differs.
+  assertEquals(patients[1].mobility_id, 4);
+  assertEquals(patients[1].care_level, patients[0].care_level);
+  assertEquals(patients[1].lift_id, patients[0].lift_id);
+  assertEquals(patients[1].tool_ids, patients[0].tool_ids);
+  assertEquals(patients[1].night_operations, patients[0].night_operations);
+  assertEquals(patients[1].dementia, patients[0].dementia);
   assertEquals(patients[1].weight, "61-70");
   // 2nd patient is the spouse — opposite gender as a best-guess heuristic.
   // Default primaryGender is "female" (when no opts.primaryGender given),

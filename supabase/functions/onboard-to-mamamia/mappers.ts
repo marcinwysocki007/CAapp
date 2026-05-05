@@ -70,9 +70,9 @@ export type NightOperations =
 export function mapNightOperations(fd: FormularDaten): NightOperations {
   const v = (fd?.nachteinsaetze ?? "").toString().toLowerCase();
   if (v === "gelegentlich") return "occasionally";
-  if (v === "taeglich") return "up_to_1_time";   // Primundus "1×" → Mamamia "≤1×"
-  if (v === "mehrmals") return "1_2_times";       // Primundus "multiple" → Mamamia 1-2×
-  if (v === "regelmaessig") return "up_to_1_time"; // legacy alias
+  if (v === "taeglich") return "up_to_1_time";       // Primundus "Täglich (1×)" → Mamamia "≤1×"
+  if (v === "mehrmals") return "more_than_2";        // Primundus "Mehrmals nachts" → Mamamia ">2×"
+  if (v === "regelmaessig") return "up_to_1_time";   // legacy alias
   return "no";
 }
 
@@ -315,8 +315,6 @@ export function buildPatients(
   // a prefill source later). Don't fabricate; the form will fill it.
   if (typeof fd?.geburtsjahr === "number") first.year_of_birth = fd.geburtsjahr;
 
-  // Second-patient placeholder uses mobile/no-lift defaults; same
-  // description scaffold so panel form passes for both rows.
   // ⚠ CORRECTNESS: a 2nd patient is added when Primundus reports
   // `betreuung_fuer === 'ehepaar'` (couple under care). The
   // `weitere_personen` flag is a different question — "are there
@@ -325,42 +323,44 @@ export function buildPatients(
   // Pre-2026-04-28 we used the wrong key here; legacy leads with only
   // weitere_personen='ja' set are now treated as single-patient.
   const isCouple = fd?.betreuung_fuer === "ehepaar";
-  const secondMob = 1;
-  const secondLiftDesc = liftDescriptionFor(secondMob);
-  const secondNightDesc = nightOperationsDescriptionFor("no");
-  const secondDemDesc = dementiaDescriptionFor("no");
 
-  // For "ehepaar" the 2nd patient is the spouse — opposite gender as a
-  // best-guess heuristic. Customer corrects via patient form when
-  // editing the second-patient row.
+  // For "ehepaar" the 2nd patient inherits the SAME care attributes as
+  // the first (Pflegegrad / mobility / night ops / dementia) — the
+  // calculator collects ONE set of answers for the couple as a unit.
+  // Pre-2026-05-01 we hardcoded second to {care_level:2, mobility:1,
+  // night_ops:"no", dementia:"no"} which silently overrode the user's
+  // input (e.g. user picked Pg4+Rollstuhl, Person 2 row in the patient
+  // form showed Pg2+"Selbstständig mobil"). Only `gender` stays a
+  // best-guess heuristic (opposite of primary) — the customer corrects
+  // both genders in the patient form anyway.
   const secondGender: "male" | "female" = primaryGender === "female" ? "male" : "female";
   const second: PatientInput | null = isCouple
     ? {
-      care_level: 2,
-      mobility_id: secondMob,
-      lift_id: mapLiftId(secondMob),
-      tool_ids: mapToolIds(secondMob),
+      care_level: mapCareLevel(fd),
+      mobility_id: mobility,
+      lift_id: liftId,
+      tool_ids: mapToolIds(mobility),
       gender: secondGender,
       weight: DEFAULT_WEIGHT,
       height: DEFAULT_HEIGHT,
-      night_operations: "no",
-      dementia: "no",
+      night_operations: nightOps,
+      dementia,
       incontinence: false,
       incontinence_feces: false,
       incontinence_urine: false,
       smoking: false,
-      lift_description: secondLiftDesc.de,
-      lift_description_de: secondLiftDesc.de,
-      lift_description_en: secondLiftDesc.en,
-      lift_description_pl: secondLiftDesc.pl,
-      night_operations_description: secondNightDesc.de,
-      night_operations_description_de: secondNightDesc.de,
-      night_operations_description_en: secondNightDesc.en,
-      night_operations_description_pl: secondNightDesc.pl,
-      dementia_description: secondDemDesc.de,
-      dementia_description_de: secondDemDesc.de,
-      dementia_description_en: secondDemDesc.en,
-      dementia_description_pl: secondDemDesc.pl,
+      lift_description: liftDesc.de,
+      lift_description_de: liftDesc.de,
+      lift_description_en: liftDesc.en,
+      lift_description_pl: liftDesc.pl,
+      night_operations_description: nightDesc.de,
+      night_operations_description_de: nightDesc.de,
+      night_operations_description_en: nightDesc.en,
+      night_operations_description_pl: nightDesc.pl,
+      dementia_description: demDesc.de,
+      dementia_description_de: demDesc.de,
+      dementia_description_en: demDesc.en,
+      dementia_description_pl: demDesc.pl,
     }
     : null;
 
