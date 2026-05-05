@@ -133,6 +133,15 @@ export interface PatientForm {
   diagnosen: string;
   plz: string; ort: string; haushalt: string; wohnungstyp: string; urbanisierung: string;
   familieNahe: string; pflegedienst: string; internet: string;
+  // Pflegedienst follow-up: required by Mamamia panel form when
+  // pflegedienst='Ja'/'Geplant' (otherwise the customer is incomplete and
+  // can't be matched). Frequency = how often, tasks = which tasks the
+  // Pflegedienst handles. Combined into customer.day_care_facility_description
+  // (with _de/_en/_pl locales) on the patient-form save.
+  // pflegedienstAufgaben holds a comma-separated list of the user-picked
+  // task labels (e.g. "Grundpflege, Wundversorgung").
+  pflegedienstHaeufigkeit: string;
+  pflegedienstAufgaben: string;
   tiere: string; unterbringung: string; aufgaben: string;
   // PK-Wünsche
   wunschGeschlecht: string; rauchen: string; sonstigeWuensche: string;

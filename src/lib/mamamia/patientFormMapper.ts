@@ -14,6 +14,10 @@ export interface PatientFormShape {
   diagnosen: string;
   plz: string; ort: string; haushalt: string; wohnungstyp: string; urbanisierung: string;
   familieNahe: string; pflegedienst: string; internet: string;
+  // Pflegedienst follow-up — populated by AngebotCard step 2 when
+  // pflegedienst='Ja'/'Geplant'. See buildDayCareFacilityDescription.
+  pflegedienstHaeufigkeit: string;
+  pflegedienstAufgaben: string;
   tiere: string; unterbringung: string; aufgaben: string;
   wunschGeschlecht: string; rauchen: string; sonstigeWuensche: string;
 }
@@ -119,6 +123,83 @@ function dayCareFacilityToApi(v: string): 'yes' | 'no' | null {
   if (v === 'Ja' || v === 'Geplant') return 'yes';
   if (v === 'Nein') return 'no';
   return null;
+}
+
+// Pflegedienst frequency — DE → en/pl translation table for the locales.
+// AngebotCard ships these exact labels (Wie oft kommt der Pflegedienst?).
+const PFLEGEDIENST_FREQ_TRANSLATIONS: Record<string, { en: string; pl: string }> = {
+  '1× pro Woche': { en: 'Once a week', pl: '1× w tygodniu' },
+  '2× pro Woche': { en: 'Twice a week', pl: '2× w tygodniu' },
+  '3× pro Woche': { en: 'Three times a week', pl: '3× w tygodniu' },
+  'Täglich': { en: 'Daily', pl: 'Codziennie' },
+  'Mehrmals täglich': { en: 'Several times a day', pl: 'Kilka razy dziennie' },
+};
+
+// Pflegedienst tasks — DE → en/pl translation table. Match the exact
+// checkbox labels rendered in AngebotCard so we can locate translations
+// without parsing.
+const PFLEGEDIENST_TASK_TRANSLATIONS: Record<string, { en: string; pl: string }> = {
+  'Grundpflege (Körperpflege, Anziehen)': {
+    en: 'Basic care (personal hygiene, dressing)',
+    pl: 'Pielęgnacja podstawowa (higiena, ubieranie)',
+  },
+  'Medikamentengabe': { en: 'Medication administration', pl: 'Podawanie leków' },
+  'Wundversorgung': { en: 'Wound care', pl: 'Opatrywanie ran' },
+  'Injektionen / Blutzucker': { en: 'Injections / blood sugar', pl: 'Iniekcje / pomiar cukru' },
+  'Behandlungspflege (z.B. Verbandwechsel)': {
+    en: 'Treatment care (e.g. dressing changes)',
+    pl: 'Pielęgnacja medyczna (np. zmiana opatrunków)',
+  },
+};
+
+// Internal separator for the pflegedienstAufgaben form-state string. The
+// task labels themselves contain commas inside parens (e.g.
+// "Grundpflege (Körperpflege, Anziehen)"), so a plain `, ` separator can't
+// be split back unambiguously. AngebotCard joins/splits with `; `; this
+// mapper does the same.
+const PFLEGEDIENST_TASKS_SEP = '; ';
+
+// Build the day_care_facility_description string + 4 locales from the
+// Pflegedienst follow-up answers. Mamamia panel form requires this when
+// day_care_facility=yes — pre-2026-05-05 we shipped 'yes' without a
+// description and Mamamia rejected the customer as incomplete.
+// Returns null when the customer answered Nein (or the follow-ups are
+// blank), so callers can skip the field entirely.
+export function buildDayCareFacilityDescription(
+  haeufigkeit: string,
+  aufgaben: string,
+): { de: string; en: string; pl: string } | null {
+  const haeu = haeufigkeit.trim();
+  const tasks = aufgaben
+    .split(PFLEGEDIENST_TASKS_SEP)
+    .map(s => s.trim())
+    .filter(Boolean);
+  if (!haeu && tasks.length === 0) return null;
+
+  // Final description joins with `, ` for agency readability — no risk of
+  // re-splitting because the consumer is free-text panel UI, not us.
+  const tasksDe = tasks.join(', ');
+  const tasksEn = tasks
+    .map(t => PFLEGEDIENST_TASK_TRANSLATIONS[t]?.en ?? t)
+    .join(', ');
+  const tasksPl = tasks
+    .map(t => PFLEGEDIENST_TASK_TRANSLATIONS[t]?.pl ?? t)
+    .join(', ');
+
+  const haeuEn = PFLEGEDIENST_FREQ_TRANSLATIONS[haeu]?.en ?? haeu;
+  const haeuPl = PFLEGEDIENST_FREQ_TRANSLATIONS[haeu]?.pl ?? haeu;
+
+  // Format: "{frequency}: {tasks}" — keeps the agency-readable string
+  // compact and predictable. When only frequency is set (or only tasks),
+  // drop the colon to avoid stray ": …" / "…: " strings.
+  const join = (h: string, t: string) =>
+    h && t ? `${h}: ${t}` : (h || t);
+
+  return {
+    de: join(haeu, tasksDe),
+    en: join(haeuEn, tasksEn),
+    pl: join(haeuPl, tasksPl),
+  };
 }
 
 // pets (tiere) — pets enum + 3 boolean flags. Form distinguishes pet
@@ -290,6 +371,13 @@ export interface MappedCustomerPatch {
   // ── Newly mapped (post-2026-04-28 audit) ──
   urbanization_id?: number;
   day_care_facility?: 'yes' | 'no';
+  // Description string + 4 locales — Mamamia panel form requires this
+  // when day_care_facility=yes. Built from pflegedienstHaeufigkeit +
+  // pflegedienstAufgaben in AngebotCard.
+  day_care_facility_description?: string;
+  day_care_facility_description_de?: string;
+  day_care_facility_description_en?: string;
+  day_care_facility_description_pl?: string;
   pets?: string;
   is_pet_dog?: boolean;
   is_pet_cat?: boolean;
@@ -359,6 +447,23 @@ export function mapPatientFormToUpdateCustomerInput(
 
   const dcf = dayCareFacilityToApi(form.pflegedienst);
   if (dcf) patch.day_care_facility = dcf;
+  // When pflegedienst is active, Mamamia requires a description (frequency
+  // + tasks). AngebotCard renders the follow-up sub-form and we serialize
+  // it here. dcf='no' skips the description entirely (no field needed).
+  if (dcf === 'yes') {
+    const desc = buildDayCareFacilityDescription(
+      form.pflegedienstHaeufigkeit ?? '',
+      form.pflegedienstAufgaben ?? '',
+    );
+    if (desc) {
+      // Mamamia stores both an unscoped and DE-locale field; mirror the
+      // DE value into both so the agency UI shows it whichever it reads.
+      patch.day_care_facility_description = desc.de;
+      patch.day_care_facility_description_de = desc.de;
+      patch.day_care_facility_description_en = desc.en;
+      patch.day_care_facility_description_pl = desc.pl;
+    }
+  }
 
   const petsObj = petsToApi(form.tiere);
   if (petsObj.pets) {

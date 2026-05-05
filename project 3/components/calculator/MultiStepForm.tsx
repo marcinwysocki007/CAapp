@@ -300,7 +300,13 @@ export function MultiStepForm() {
       case 5: return Boolean(state.mobility);
       case 6: return Boolean(state.nightCare);
       case 7: return Boolean(state.germanLevel);
-      case 8: return Boolean(state.driving);
+      // Step 8: driving=ja requires gearbox follow-up answered; driving=nein
+      // skips it (no gearbox needed when no license required).
+      case 8: return state.driving === 'nein'
+        ? true
+        : state.driving === 'ja'
+          ? Boolean(state.drivingGearbox)
+          : false;
       case 9: return Boolean(state.gender);
       case 10: return Boolean(formData.name && formData.email && formData.acceptPrivacy);
       default: return false;
@@ -349,6 +355,12 @@ export function MultiStepForm() {
         nachteinsaetze: state.nightCare || '',
         deutschkenntnisse: state.germanLevel || '',
         fuehrerschein: state.driving || '',
+        // Getriebe (gearbox) — only meaningful when fuehrerschein='ja'. The
+        // onboard mapper falls back to 'automatic' when blank or 'egal'.
+        // Pre-2026-05-05 we hardcoded driving_license_gearbox='automatic'
+        // server-side regardless of customer car — frustrating mismatch
+        // for customers with a Schaltung-only vehicle.
+        fuehrerschein_getriebe: state.drivingGearbox || '',
         geschlecht: state.gender || '',
       };
 
@@ -976,7 +988,16 @@ export function MultiStepForm() {
                   ].map(({ value, label, description }) => (
                     <div key={value} className="relative flex items-center gap-2">
                       <button
-                        onClick={() => updateState({ driving: value as any })}
+                        onClick={() => {
+                          // Reset gearbox when user switches to 'nein' so a
+                          // stale 'schaltung' from a previous Ja-pick doesn't
+                          // get sent silently if they revisit the step.
+                          if (value === 'nein') {
+                            updateState({ driving: 'nein', drivingGearbox: null });
+                          } else {
+                            updateState({ driving: value as any });
+                          }
+                        }}
                         className={`flex-1 ${btnClass(state.driving === value)}`}
                       >
                         <div className="flex items-center justify-start gap-3.5">
@@ -1005,6 +1026,54 @@ export function MultiStepForm() {
                       </div>
                     </div>
                   ))}
+
+                  {/* Sub-question: gearbox type. Shown only when fuehrerschein=Ja.
+                      Pre-2026-05-05 we always sent driving_license_gearbox='automatic'
+                      to Mamamia regardless of customer's actual car — bug for
+                      Schaltung-only vehicles where matched caregivers couldn't drive. */}
+                  {state.driving === 'ja' && (
+                    <div className="mt-3 pt-3 border-t border-[#E5E3DF]/60">
+                      <p className="text-sm font-semibold text-[#3D3D3D] mb-2.5">Welches Getriebe hat Ihr Fahrzeug?</p>
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {[
+                          { value: 'automatik', label: 'Automatik', description: 'Mehr Pflegekräfte zur Auswahl — die meisten haben Erfahrung mit Automatik.' },
+                          { value: 'schaltung', label: 'Schaltung', description: 'Etwas weniger Auswahl, aber wir finden eine Pflegekraft mit Schaltgetriebe-Erfahrung.' },
+                          { value: 'egal', label: 'Egal / weiß nicht', description: 'Wir suchen die größtmögliche Auswahl an Pflegekräften.' }
+                        ].map(({ value, label, description }) => (
+                          <div key={value} className="relative flex items-center gap-2">
+                            <button
+                              onClick={() => updateState({ drivingGearbox: value as any })}
+                              className={`flex-1 ${btnClass(state.drivingGearbox === value)}`}
+                            >
+                              <div className="flex items-center justify-start gap-3.5">
+                                <div className={`w-5 h-5 rounded-full border flex-shrink-0 transition-all duration-200 ${
+                                  state.drivingGearbox === value
+                                    ? 'border-[#8B7355] bg-[#8B7355] border-[3px]'
+                                    : 'border-gray-300 bg-white border-2'
+                                }`}>
+                                  {state.drivingGearbox === value && (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <div className="w-2 h-2 bg-white rounded-full"></div>
+                                    </div>
+                                  )}
+                                </div>
+                                <span className="text-base font-medium text-[#3D3D3D]">{label}</span>
+                              </div>
+                            </button>
+                            <div className="relative group flex-shrink-0">
+                              <button className="w-6 h-6 rounded-full bg-[#F0EDE8] hover:bg-[#E5E0D8] flex items-center justify-center transition-colors" type="button">
+                                <span className="text-[11px] font-bold text-[#8B7355]">i</span>
+                              </button>
+                              <div className="absolute right-0 bottom-8 w-56 bg-[#3D3D3D] text-white text-xs leading-snug rounded-xl px-3 py-2.5 shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-10">
+                                {description}
+                                <span className="absolute -bottom-1.5 right-2 w-3 h-3 bg-[#3D3D3D] rotate-45" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -568,6 +568,11 @@ export interface PatientFormPrefill {
   plz?: string; ort?: string;
   wohnungstyp?: string; urbanisierung?: string; unterbringung?: string;
   familieNahe?: string; pflegedienst?: string; internet?: string;
+  // Pflegedienst follow-up — parsed back from
+  // customer.day_care_facility_description so the form re-opens with the
+  // user's previously-saved frequency + tasks.
+  pflegedienstHaeufigkeit?: string;
+  pflegedienstAufgaben?: string;
   tiere?: string;
   wunschGeschlecht?: string; rauchen?: string;
   aufgaben?: string; sonstigeWuensche?: string;
@@ -662,6 +667,23 @@ export function mapMamamiaCustomerToPatientForm(
 
   if (cust.day_care_facility === 'yes') out.pflegedienst = 'Ja';
   else if (cust.day_care_facility === 'no') out.pflegedienst = 'Nein';
+
+  // Re-parse the day_care_facility_description string we wrote in
+  // patientFormMapper.buildDayCareFacilityDescription. Format: "{frequency}: {tasks}".
+  // We tolerate either field empty (build can produce just "{frequency}" or
+  // just "{tasks}") so the parser accepts a single half too.
+  const desc = cust.day_care_facility_description_de ?? cust.day_care_facility_description ?? '';
+  if (desc && cust.day_care_facility === 'yes') {
+    const colonIdx = desc.indexOf(':');
+    if (colonIdx >= 0) {
+      out.pflegedienstHaeufigkeit = desc.slice(0, colonIdx).trim();
+      out.pflegedienstAufgaben = desc.slice(colonIdx + 1).trim();
+    } else {
+      // No colon — assume the agency typed a free-text frequency or tasks.
+      // Keep it on Häufigkeit so the user sees their data and can edit it.
+      out.pflegedienstHaeufigkeit = desc.trim();
+    }
+  }
 
   out.tiere = mamamiaPetsToForm(
     cust.pets, cust.is_pet_dog, cust.is_pet_cat, cust.is_pet_other,

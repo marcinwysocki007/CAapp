@@ -18,6 +18,10 @@ export type NightCare = 'nein' | 'gelegentlich' | 'taeglich' | 'mehrmals';
 export type GermanLevel = 'grundlegend' | 'kommunikativ' | 'sehr-gut';
 export type Experience = 'einsteiger' | 'erfahren' | 'sehr-erfahren';
 export type Driving = 'egal' | 'ja' | 'nein';
+// Getriebe (gearbox) — only relevant when driving === 'ja'. "egal" = either
+// works (we send 'automatic' to Mamamia for max caregiver pool), "schaltung"
+// = manual gearbox required, "automatik" = automatic gearbox required.
+export type DrivingGearbox = 'egal' | 'schaltung' | 'automatik';
 export type Gender = 'egal' | 'weiblich' | 'maennlich';
 
 interface PricingConfig {
@@ -62,6 +66,7 @@ export interface CalculatorState {
   germanLevel: GermanLevel | null;
   experience: Experience | null;
   driving: Driving | null;
+  drivingGearbox: DrivingGearbox | null;
   gender: Gender | null;
 }
 
@@ -107,6 +112,7 @@ const initialState: CalculatorState = {
   germanLevel: null,
   experience: null,
   driving: null,
+  drivingGearbox: null,
   gender: null,
 };
 

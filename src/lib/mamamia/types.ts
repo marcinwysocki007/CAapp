@@ -96,6 +96,8 @@ export interface MamamiaCustomer {
   is_pet_cat?: boolean | null;
   is_pet_other?: boolean | null;
   day_care_facility?: string | null;
+  day_care_facility_description?: string | null;
+  day_care_facility_description_de?: string | null;
   /** Patients — full shape for prefill, not just { id }. */
   patients?: MamamiaPatient[];
   customer_caregiver_wish?: MamamiaCaregiverWish | null;

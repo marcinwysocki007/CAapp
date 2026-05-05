@@ -35,6 +35,8 @@ function makeForm(overrides: Partial<PatientFormShape> = {}): PatientFormShape {
     urbanisierung: 'Großstadt',
     familieNahe: 'Ja',
     pflegedienst: 'Nein',
+    pflegedienstHaeufigkeit: '',
+    pflegedienstAufgaben: '',
     internet: 'Ja',
     tiere: 'Keine',
     unterbringung: 'Zimmer in den Räumlichkeiten',
@@ -229,5 +231,93 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients?.[0].gender).toBeUndefined();
     expect(r.patients?.[0].care_level).toBeUndefined();
     expect(r.patients?.[0].mobility_id).toBeUndefined();
+  });
+
+  // ─── Bug #9: day_care_facility_description (frequency + tasks) ─────────
+  // Mamamia panel form requires day_care_facility_description (+ locales)
+  // when day_care_facility=yes. AngebotCard's follow-up sub-form populates
+  // pflegedienstHaeufigkeit + pflegedienstAufgaben; this mapper combines
+  // them into the description string with 4 locale variants.
+
+  describe('day_care_facility_description', () => {
+    it('pflegedienst=Ja with frequency + tasks → description in 4 locales', () => {
+      // pflegedienstAufgaben uses '; ' as the internal separator so the
+      // task labels (which contain commas inside parens like
+      // "Grundpflege (Körperpflege, Anziehen)") can be split back
+      // unambiguously.
+      const r = mapPatientFormToUpdateCustomerInput(makeForm({
+        pflegedienst: 'Ja',
+        pflegedienstHaeufigkeit: '2× pro Woche',
+        pflegedienstAufgaben: 'Grundpflege (Körperpflege, Anziehen); Wundversorgung',
+      }));
+      expect(r.day_care_facility).toBe('yes');
+      expect(r.day_care_facility_description).toBe(
+        '2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung',
+      );
+      expect(r.day_care_facility_description_de).toBe(
+        '2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung',
+      );
+      expect(r.day_care_facility_description_en).toBe(
+        'Twice a week: Basic care (personal hygiene, dressing), Wound care',
+      );
+      expect(r.day_care_facility_description_pl).toBe(
+        '2× w tygodniu: Pielęgnacja podstawowa (higiena, ubieranie), Opatrywanie ran',
+      );
+    });
+
+    it('pflegedienst=Geplant treated like Ja (Mamamia has no third option)', () => {
+      const r = mapPatientFormToUpdateCustomerInput(makeForm({
+        pflegedienst: 'Geplant',
+        pflegedienstHaeufigkeit: 'Täglich',
+        pflegedienstAufgaben: 'Medikamentengabe',
+      }));
+      expect(r.day_care_facility).toBe('yes');
+      expect(r.day_care_facility_description_de).toBe('Täglich: Medikamentengabe');
+      expect(r.day_care_facility_description_en).toBe('Daily: Medication administration');
+      expect(r.day_care_facility_description_pl).toBe('Codziennie: Podawanie leków');
+    });
+
+    it('pflegedienst=Nein → no description fields emitted', () => {
+      // Critical: don't ship a stale description string when the customer
+      // says "no Pflegedienst" — Mamamia would render the contradictory
+      // pair (day_care_facility=no + description='Täglich: …') in the panel.
+      const r = mapPatientFormToUpdateCustomerInput(makeForm({
+        pflegedienst: 'Nein',
+        pflegedienstHaeufigkeit: 'Täglich', // stale leftover
+        pflegedienstAufgaben: 'Medikamentengabe',
+      }));
+      expect(r.day_care_facility).toBe('no');
+      expect(r.day_care_facility_description).toBeUndefined();
+      expect(r.day_care_facility_description_de).toBeUndefined();
+      expect(r.day_care_facility_description_en).toBeUndefined();
+      expect(r.day_care_facility_description_pl).toBeUndefined();
+    });
+
+    it('pflegedienst=Ja with empty follow-ups → no description (mapper tolerates partial)', () => {
+      // Validation in AngebotCard prevents save when follow-ups are blank,
+      // but this is a defense-in-depth: if a malformed body slips through,
+      // we don't ship "yes" + literal "" — we just omit the description.
+      const r = mapPatientFormToUpdateCustomerInput(makeForm({
+        pflegedienst: 'Ja',
+        pflegedienstHaeufigkeit: '',
+        pflegedienstAufgaben: '',
+      }));
+      expect(r.day_care_facility).toBe('yes');
+      expect(r.day_care_facility_description).toBeUndefined();
+    });
+
+    it('unknown task label passes through verbatim in EN/PL (graceful degrade)', () => {
+      // If the AngebotCard checkbox set is extended without updating the
+      // translation tables, we still ship something readable — the agency
+      // sees the German label in all locales rather than dropped data.
+      const r = mapPatientFormToUpdateCustomerInput(makeForm({
+        pflegedienst: 'Ja',
+        pflegedienstHaeufigkeit: '1× pro Woche',
+        pflegedienstAufgaben: 'Spritzen vorbereiten', // not in dictionary
+      }));
+      expect(r.day_care_facility_description_de).toBe('1× pro Woche: Spritzen vorbereiten');
+      expect(r.day_care_facility_description_en).toBe('Once a week: Spritzen vorbereiten');
+      expect(r.day_care_facility_description_pl).toBe('1× w tygodniu: Spritzen vorbereiten');
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import {
   buildCaregiverWish,
+  mapDrivingGearbox,
   buildContactsFromLead,
   buildContractFromLead,
   buildCustomerInput,
@@ -219,6 +220,36 @@ Deno.test("mapDrivingLicense: nein / egal / missing → not_important", () => {
   assertEquals(mapDrivingLicense(makeFormularDaten({ fuehrerschein: "nein" })), "not_important");
   assertEquals(mapDrivingLicense(makeFormularDaten({ fuehrerschein: "egal" })), "not_important");
   assertEquals(mapDrivingLicense({} as FormularDaten), "not_important");
+});
+
+// ─── mapDrivingGearbox ─────────────────────────────────────────────────────
+// Bug #8 (2026-05-05): pre-fix we hardcoded driving_license_gearbox='automatic'
+// in buildCaregiverWish regardless of customer answer. Now it reads
+// fuehrerschein_getriebe (Schaltung / Automatik / Egal) from the
+// calculator's step-8 sub-question.
+
+Deno.test("mapDrivingGearbox: schaltung → manual", () => {
+  assertEquals(
+    mapDrivingGearbox(makeFormularDaten({ fuehrerschein_getriebe: "schaltung" })),
+    "manual",
+  );
+});
+
+Deno.test("mapDrivingGearbox: automatik → automatic", () => {
+  assertEquals(
+    mapDrivingGearbox(makeFormularDaten({ fuehrerschein_getriebe: "automatik" })),
+    "automatic",
+  );
+});
+
+Deno.test("mapDrivingGearbox: egal / missing → automatic (permissive default)", () => {
+  // 'egal' is the most permissive customer answer — any licensed cg can
+  // drive an automatic, so we widen the search by sending 'automatic'.
+  assertEquals(
+    mapDrivingGearbox(makeFormularDaten({ fuehrerschein_getriebe: "egal" })),
+    "automatic",
+  );
+  assertEquals(mapDrivingGearbox({} as FormularDaten), "automatic");
 });
 
 // ─── mapGender ───────────────────────────────────────────────────────────────
@@ -524,6 +555,46 @@ Deno.test("buildCaregiverWish: real Primundus stage-A fields override defaults",
   assertEquals(wish.germany_skill, "level_4");
   assertEquals(wish.driving_license, "yes");
   assertEquals(wish.gender, "male");
+});
+
+Deno.test("buildCaregiverWish: fuehrerschein=ja with Schaltung → driving_license_gearbox=manual", () => {
+  // Bug #8 fix: customer with manual gearbox car must match cgs trained
+  // on manual. Pre-2026-05-05 this was hardcoded "automatic" regardless.
+  const wish = buildCaregiverWish(makeFormularDaten({
+    fuehrerschein: "ja",
+    fuehrerschein_getriebe: "schaltung",
+  }));
+  assertEquals(wish.driving_license, "yes");
+  assertEquals(wish.driving_license_gearbox, "manual");
+});
+
+Deno.test("buildCaregiverWish: fuehrerschein=ja with Automatik → driving_license_gearbox=automatic", () => {
+  const wish = buildCaregiverWish(makeFormularDaten({
+    fuehrerschein: "ja",
+    fuehrerschein_getriebe: "automatik",
+  }));
+  assertEquals(wish.driving_license_gearbox, "automatic");
+});
+
+Deno.test("buildCaregiverWish: fuehrerschein=ja with egal/missing → automatic (permissive)", () => {
+  const w1 = buildCaregiverWish(makeFormularDaten({
+    fuehrerschein: "ja",
+    fuehrerschein_getriebe: "egal",
+  }));
+  assertEquals(w1.driving_license_gearbox, "automatic");
+  // No gearbox in formularDaten still falls back to automatic.
+  const w2 = buildCaregiverWish(makeFormularDaten({ fuehrerschein: "ja" }));
+  assertEquals(w2.driving_license_gearbox, "automatic");
+});
+
+Deno.test("buildCaregiverWish: fuehrerschein=nein → driving_license_gearbox unset", () => {
+  // No gearbox question shown when customer doesn't need a driving cg.
+  const wish = buildCaregiverWish(makeFormularDaten({
+    fuehrerschein: "nein",
+    fuehrerschein_getriebe: "schaltung", // stale leftover, ignored
+  }));
+  assertEquals(wish.driving_license, "not_important");
+  assertEquals(wish.driving_license_gearbox, undefined);
 });
 
 // ─── extractPlzFromLead (primary path) ─────────────────────────────────────

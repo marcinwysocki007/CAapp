@@ -21,6 +21,10 @@ export interface FormularDaten {
   // Caregiver-wish fields (mapped to customer_caregiver_wish in Mamamia)
   deutschkenntnisse?: "grundlegend" | "kommunikativ" | "sehr-gut" | string;
   fuehrerschein?: "ja" | "nein" | "egal" | string;
+  // Getriebe (gearbox) — only meaningful when fuehrerschein='ja'. Calculator
+  // step 8 sub-question. Drives driving_license_gearbox; "egal" → fall back
+  // to permissive default 'automatic' (more cgs qualify).
+  fuehrerschein_getriebe?: "automatik" | "schaltung" | "egal" | string;
   erfahrung?: "einsteiger" | "erfahren" | "sehr-erfahren" | string;
   // Optional / legacy
   demenz?: string;

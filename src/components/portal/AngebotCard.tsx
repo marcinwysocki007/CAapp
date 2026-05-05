@@ -123,6 +123,8 @@ export const AngebotCard: FC<{
     haushalt: pick('haushalt') || 'Ehepartner/in',
     wohnungstyp: pick('wohnungstyp'), urbanisierung: pick('urbanisierung'),
     familieNahe: pick('familieNahe'), pflegedienst: pick('pflegedienst'), internet: pick('internet'),
+    pflegedienstHaeufigkeit: pick('pflegedienstHaeufigkeit'),
+    pflegedienstAufgaben: pick('pflegedienstAufgaben'),
     tiere: pick('tiere'), unterbringung: pick('unterbringung'), aufgaben: pick('aufgaben'),
     wunschGeschlecht: pick('wunschGeschlecht'),
     rauchen: pick('rauchen'), sonstigeWuensche: pick('sonstigeWuensche'),
@@ -226,9 +228,17 @@ export const AngebotCard: FC<{
       return p1ok && p2ok;
     }
     if (s === 2) {
-      return patient.plz !== '' && patient.ort !== '' && patient.haushalt !== ''
+      const baseOk = patient.plz !== '' && patient.ort !== '' && patient.haushalt !== ''
         && patient.wohnungstyp !== '' && patient.urbanisierung !== '' && patient.familieNahe !== ''
         && patient.pflegedienst !== '' && patient.internet !== '';
+      // When Pflegedienst='Ja' or 'Geplant', Mamamia requires a description
+      // of frequency + tasks (panel form gates customer completion on it).
+      // 'Nein' skips both follow-ups.
+      const pflegedienstActive = patient.pflegedienst === 'Ja' || patient.pflegedienst === 'Geplant';
+      if (pflegedienstActive) {
+        return baseOk && patient.pflegedienstHaeufigkeit !== '' && patient.pflegedienstAufgaben !== '';
+      }
+      return baseOk;
     }
     if (s === 3) {
       return patient.wunschGeschlecht !== '' && patient.rauchen !== '';
@@ -962,9 +972,83 @@ export const AngebotCard: FC<{
                   </div>
                   <div>
                     <label className={labelCls}>Pflegedienst kommt? <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.pflegedienst} onChange={v => updatePatient(p=>({...p,pflegedienst:v}))}
+                    <CustomSelect value={patient.pflegedienst} onChange={v => updatePatient(p=>{
+                      // When user switches to 'Nein', clear the follow-ups so
+                      // a stale frequency/tasks selection doesn't sneak into
+                      // the Mamamia description string on save.
+                      const next = { ...p, pflegedienst: v };
+                      if (v === 'Nein') {
+                        next.pflegedienstHaeufigkeit = '';
+                        next.pflegedienstAufgaben = '';
+                      }
+                      return next;
+                    })}
                       options={['Ja','Nein','Geplant']} />
                   </div>
+
+                  {/* Pflegedienst follow-up: frequency + tasks. Required by
+                      Mamamia panel form when pflegedienst='Ja'/'Geplant' —
+                      pre-2026-05-05 we sent day_care_facility=yes without a
+                      description and the customer flow stalled with
+                      "Wie oft und welche Aufgaben übernimmt der Pflegedienst?"
+                      validation error. */}
+                  {(patient.pflegedienst === 'Ja' || patient.pflegedienst === 'Geplant') && (
+                    <div className="space-y-3 pl-3 border-l-2 border-[#9B1FA1]/20">
+                      <div>
+                        <label className={labelCls}>Wie oft kommt der Pflegedienst? <span className="text-red-400">*</span></label>
+                        <CustomSelect value={patient.pflegedienstHaeufigkeit}
+                          onChange={v => updatePatient(p=>({...p,pflegedienstHaeufigkeit:v}))}
+                          options={['1× pro Woche','2× pro Woche','3× pro Woche','Täglich','Mehrmals täglich']} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Welche Aufgaben übernimmt der Pflegedienst? <span className="text-red-400">*</span></label>
+                        <p className="text-xs text-gray-500 mb-2">Mehrfachauswahl möglich</p>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {[
+                            'Grundpflege (Körperpflege, Anziehen)',
+                            'Medikamentengabe',
+                            'Wundversorgung',
+                            'Injektionen / Blutzucker',
+                            'Behandlungspflege (z.B. Verbandwechsel)',
+                          ].map(task => {
+                            // Use '; ' as separator: task labels contain
+                            // commas inside parens, so a comma-joined string
+                            // can't be split back unambiguously.
+                            const selected = patient.pflegedienstAufgaben
+                              .split('; ')
+                              .map(s => s.trim())
+                              .filter(Boolean);
+                            const checked = selected.includes(task);
+                            return (
+                              <label key={task}
+                                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border cursor-pointer transition-colors ${
+                                  checked
+                                    ? 'bg-[#9B1FA1]/5 border-[#9B1FA1]/40'
+                                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                                }`}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => updatePatient(p => {
+                                    const cur = p.pflegedienstAufgaben
+                                      .split('; ')
+                                      .map(s => s.trim())
+                                      .filter(Boolean);
+                                    const next = checked
+                                      ? cur.filter(t => t !== task)
+                                      : [...cur, task];
+                                    return { ...p, pflegedienstAufgaben: next.join('; ') };
+                                  })}
+                                  className="w-4 h-4 rounded border-gray-300 text-[#9B1FA1] focus:ring-[#9B1FA1]/30"
+                                />
+                                <span className="text-sm text-gray-700">{task}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
