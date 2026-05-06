@@ -128,6 +128,7 @@ export const AngebotCard: FC<{
     tiere: pick('tiere'), unterbringung: pick('unterbringung'), aufgaben: pick('aufgaben'),
     wunschGeschlecht: pick('wunschGeschlecht'),
     rauchen: pick('rauchen'), sonstigeWuensche: pick('sonstigeWuensche'),
+    wunschGetriebe: pick('wunschGetriebe'),
   });
 
   const zwei = patient.anzahl === '2';
@@ -245,7 +246,14 @@ export const AngebotCard: FC<{
       return baseOk;
     }
     if (s === 3) {
-      return patient.wunschGeschlecht !== '' && patient.rauchen !== '';
+      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '';
+      // Gearbox is required only when the customer's calculator answer
+      // said they need a driving caregiver — surfaced via Mamamia state.
+      const needsGearbox = mmCustomer?.customer_caregiver_wish?.driving_license === 'yes';
+      if (needsGearbox) {
+        return baseOk && patient.wunschGetriebe !== '';
+      }
+      return baseOk;
     }
     return false;
   };
@@ -1083,19 +1091,25 @@ export const AngebotCard: FC<{
                       <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">mind. B1</div>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
+                      <label className={labelCls}>
                         Führerschein
-                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'fuehrerschein' ? null : 'fuehrerschein')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
-                        </button>
+                        {mmCustomer?.customer_caregiver_wish?.driving_license === 'yes' && (
+                          <span className="text-red-400"> *</span>
+                        )}
                       </label>
-                      {priceInfo === 'fuehrerschein' && (
-                        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
-                          <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
-                          <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
-                        </div>
+                      {/* When the calculator answered fuehrerschein=Ja
+                          (mirror via Mamamia.customer_caregiver_wish.driving_license=yes),
+                          let the user pick the gearbox they need. Otherwise
+                          show the static "Nicht erforderlich" — license isn't
+                          required for matching, so gearbox is moot. */}
+                      {mmCustomer?.customer_caregiver_wish?.driving_license === 'yes' ? (
+                        <CustomSelect value={patient.wunschGetriebe}
+                          onChange={v => updatePatient(p=>({...p,wunschGetriebe:v}))}
+                          options={['Automatik','Schaltung','Egal']}
+                          placeholder="Bitte wählen" />
+                      ) : (
+                        <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">Nicht erforderlich</div>
                       )}
-                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">Nicht erforderlich</div>
                     </div>
                   </div>
 

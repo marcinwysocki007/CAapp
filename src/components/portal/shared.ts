@@ -145,6 +145,11 @@ export interface PatientForm {
   tiere: string; unterbringung: string; aufgaben: string;
   // PK-Wünsche
   wunschGeschlecht: string; rauchen: string; sonstigeWuensche: string;
+  // Getriebe (gearbox) — only shown/required when the customer answered
+  // fuehrerschein=Ja in the calculator (driving_license=yes on Mamamia).
+  // Maps to customer_caregiver_wish.driving_license_gearbox. Empty when
+  // not applicable.
+  wunschGetriebe: string;
 }
 
 export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche zur PK'];

@@ -417,22 +417,6 @@ export function mapDrivingLicense(
   return "not_important"; // egal / nein / missing
 }
 
-// ─── Driving license gearbox ───────────────────────────────────────────────
-// Calculator step 8 sub-question (only shown when fuehrerschein=ja). Mamamia
-// enum has only 2 values: "automatic" | "manual". We default to "automatic"
-// when the customer answered "egal" or didn't reach the question — that's
-// the more permissive choice (any licensed caregiver can drive an automatic;
-// only manual-trained ones can drive a Schaltung). Pre-2026-05-05 this was
-// hardcoded "automatic" regardless of customer car — broken match for
-// Schaltung-only households.
-export function mapDrivingGearbox(
-  fd: FormularDaten,
-): "automatic" | "manual" {
-  const v = (fd?.fuehrerschein_getriebe ?? "").toString().toLowerCase();
-  if (v === "schaltung" || v === "manual") return "manual";
-  // automatik / automatic / egal / empty → automatic (permissive default)
-  return "automatic";
-}
 
 // ─── Build the CustomerCaregiverWish from formularDaten + defaults ──────────
 // 100% of active customers have one. Real lead data (deutschkenntnisse,
@@ -440,10 +424,11 @@ export function mapDrivingGearbox(
 // only when calculator didn't capture it.
 export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
   // When driving_license=yes the panel form requires
-  // driving_license_gearbox (automatic / manual). Read it from the
-  // calculator's step 8 sub-question (fuehrerschein_getriebe). Empty/egal
-  // → 'automatic' (permissive — most cgs qualify). Skip the field
-  // entirely when driving_license is not_important (no car needed).
+  // driving_license_gearbox (automatic / manual). The customer picks
+  // Automatik / Schaltung / Egal in the CA-app patient form (step 3 /
+  // Wünsche zur PK); this onboard pass writes a permissive 'automatic'
+  // default so Mamamia matching can run before the patient form save.
+  // Skip the field entirely when driving_license is not_important.
   const drivingLicense = mapDrivingLicense(fd);
   const wish: CaregiverWishInput = {
     is_open_for_all: false,
@@ -465,7 +450,7 @@ export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
     shopping_be_done_pl: "Wedle uzgodnienia",
   };
   if (drivingLicense === "yes") {
-    wish.driving_license_gearbox = mapDrivingGearbox(fd);
+    wish.driving_license_gearbox = "automatic";
   }
   return wish;
 }

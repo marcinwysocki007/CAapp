@@ -21,10 +21,10 @@ export interface FormularDaten {
   // Caregiver-wish fields (mapped to customer_caregiver_wish in Mamamia)
   deutschkenntnisse?: "grundlegend" | "kommunikativ" | "sehr-gut" | string;
   fuehrerschein?: "ja" | "nein" | "egal" | string;
-  // Getriebe (gearbox) — only meaningful when fuehrerschein='ja'. Calculator
-  // step 8 sub-question. Drives driving_license_gearbox; "egal" → fall back
-  // to permissive default 'automatic' (more cgs qualify).
-  fuehrerschein_getriebe?: "automatik" | "schaltung" | "egal" | string;
+  // Getriebe (gearbox) lives on the CA-app patient form (step 3 / Wünsche
+  // zur PK), not in the calculator. Onboard sets a permissive 'automatic'
+  // default when fuehrerschein='ja' so Mamamia matching can run before
+  // the patient form is saved.
   erfahrung?: "einsteiger" | "erfahren" | "sehr-erfahren" | string;
   // Optional / legacy
   demenz?: string;

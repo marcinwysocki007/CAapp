@@ -44,6 +44,7 @@ function makeForm(overrides: Partial<PatientFormShape> = {}): PatientFormShape {
     wunschGeschlecht: 'Egal',
     rauchen: 'Nein',
     sonstigeWuensche: '',
+    wunschGetriebe: '',
     ...overrides,
   };
 }
@@ -194,6 +195,21 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
   it('derives other_people_in_house from anzahl (yes/no enum)', () => {
     expect(mapPatientFormToUpdateCustomerInput(makeForm({ anzahl: '2' })).other_people_in_house).toBe('yes');
     expect(mapPatientFormToUpdateCustomerInput(makeForm({ anzahl: '1' })).other_people_in_house).toBe('no');
+  });
+
+  it('maps wunschGetriebe → customer_caregiver_wish.driving_license_gearbox', () => {
+    // Customer picks the gearbox in the CA-app patient form (step 3).
+    // Schaltung → manual; Automatik → automatic; Egal → automatic
+    // (permissive — any licensed cg can drive auto). Empty omits the
+    // field so the onboard default ('automatic') sticks.
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wunschGetriebe: 'Schaltung' }))
+      .customer_caregiver_wish?.driving_license_gearbox).toBe('manual');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wunschGetriebe: 'Automatik' }))
+      .customer_caregiver_wish?.driving_license_gearbox).toBe('automatic');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wunschGetriebe: 'Egal' }))
+      .customer_caregiver_wish?.driving_license_gearbox).toBe('automatic');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wunschGetriebe: '' }))
+      .customer_caregiver_wish?.driving_license_gearbox).toBeUndefined();
   });
 
   it('maps rauchen → customer_caregiver_wish.smoking (yes_outside / no)', () => {

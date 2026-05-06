@@ -20,6 +20,9 @@ export interface PatientFormShape {
   pflegedienstAufgaben: string;
   tiere: string; unterbringung: string; aufgaben: string;
   wunschGeschlecht: string; rauchen: string; sonstigeWuensche: string;
+  // Getriebe — only populated when the customer answered fuehrerschein=Ja
+  // in the calculator. Empty = field hidden / not applicable.
+  wunschGetriebe: string;
 }
 
 // Mobility label → Mamamia mobility_id (SADASH docs + live-verified in K1).
@@ -284,10 +287,18 @@ function wishSmokingToApi(v: string): 'yes_outside' | 'no' | null {
   return null;
 }
 
-// driving_license is NOT in the in-portal patient form (that's a stage-A
-// formularDaten question — handled by backend onboard mapper). So this
-// frontend mapper has nothing to send here, and consequently no need to
-// supply driving_license_gearbox either.
+// driving_license itself is set by the calculator (formularDaten →
+// onboard). The patient form lets the customer specify the gearbox
+// preference (Automatik / Schaltung / Egal), which Mamamia stores as
+// customer_caregiver_wish.driving_license_gearbox. "Egal" maps to
+// 'automatic' — same permissive default the onboard pass writes.
+function wishDrivingGearboxToApi(v: string): 'automatic' | 'manual' | null {
+  if (v === 'Schaltung') return 'manual';
+  if (v === 'Automatik') return 'automatic';
+  // 'Egal' → 'automatic' (permissive — any licensed cg can drive auto)
+  if (v === 'Egal') return 'automatic';
+  return null;
+}
 
 // Build a single patient object for UpdateCustomer.patients[].
 // Threading existing `patientId` is critical — Mamamia SILENTLY DROPS fields
@@ -353,6 +364,7 @@ function buildPatient(
 export interface CaregiverWishPatch {
   gender?: 'female' | 'male' | 'not_important';
   smoking?: 'yes_outside' | 'no';
+  driving_license_gearbox?: 'automatic' | 'manual';
   tasks?: string;
   tasks_de?: string;
   other_wishes?: string;
@@ -483,6 +495,8 @@ export function mapPatientFormToUpdateCustomerInput(
   if (wg) wish.gender = wg;
   const ws = wishSmokingToApi(form.rauchen);
   if (ws) wish.smoking = ws;
+  const wgear = wishDrivingGearboxToApi(form.wunschGetriebe);
+  if (wgear) wish.driving_license_gearbox = wgear;
   if (form.aufgaben) {
     wish.tasks = form.aufgaben;
     wish.tasks_de = form.aufgaben;

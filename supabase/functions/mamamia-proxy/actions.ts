@@ -309,6 +309,7 @@ const WISH_ALLOWED = new Set([
   "gender",
   "germany_skill",
   "driving_license",
+  "driving_license_gearbox",
   "smoking",
   "shopping",
   "tasks",

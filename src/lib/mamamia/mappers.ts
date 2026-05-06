@@ -597,6 +597,10 @@ export interface PatientFormPrefill {
   pflegedienstAufgaben?: string;
   tiere?: string;
   wunschGeschlecht?: string; rauchen?: string;
+  // Customer-side gearbox preference, restored from
+  // customer_caregiver_wish.driving_license_gearbox so the form re-opens
+  // with the user's previously-saved Automatik / Schaltung pick.
+  wunschGetriebe?: string;
   aufgaben?: string; sonstigeWuensche?: string;
 }
 
@@ -731,6 +735,16 @@ export function mapMamamiaCustomerToPatientForm(
     out.rauchen = mamamiaWishSmokingToForm(wish.smoking);
     out.aufgaben = wish.tasks ?? '';
     out.sonstigeWuensche = wish.other_wishes ?? '';
+    // Gearbox: 'manual' → Schaltung, 'automatic' → empty (the onboard
+    // default — leave blank so the user explicitly picks instead of
+    // seeing "Automatik" preselected). When the user saves a deliberate
+    // 'automatic' from the form, on reload they'll still see blank — same
+    // tradeoff as Bug #11 weight/height suppression. They can repick.
+    if (wish.driving_license_gearbox === 'manual') {
+      out.wunschGetriebe = 'Schaltung';
+    } else {
+      out.wunschGetriebe = '';
+    }
   }
 
   return out;
